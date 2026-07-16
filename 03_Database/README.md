@@ -7,6 +7,7 @@ Database implementation follows `02_Architecture/DatabaseArchitecture.md` and th
 - Shared database and shared schema for V1/V2.
 - Every tenant-scoped table has a non-null `tenant_id`.
 - UUIDv7 is used for primary keys.
+- A user phone number is globally unique for unambiguous MVP login (ADR-009).
 - PostgreSQL Row-Level Security is the final tenant-isolation boundary.
 - Financial and operational history is append-only or soft-deleted.
 - Monetary values use integer UZS tiyin at API boundaries and exact `numeric` values in calculation queries.

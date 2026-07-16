@@ -59,6 +59,7 @@ Use the non-superuser `DATABASE_URL` for the application. `DATABASE_ADMIN_URL` i
 - Initial tenant, user, department, foreman assignment, session, and audit schema.
 - Forced RLS policies and a separate least-privilege application database role.
 - Unit, HTTP e2e, and cross-tenant database integration tests.
+- RS256 phone/PIN login, lockout, refresh rotation, and logout.
 
 ## Quality Gates
 

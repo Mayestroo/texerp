@@ -126,6 +126,17 @@ describe('PostgreSQL tenant isolation', () => {
     expect(result.rows).toEqual([{ id: userA }]);
   });
 
+  it('rejects a phone number already used by another tenant', async () => {
+    await expect(
+      admin.query(
+        `INSERT INTO users
+          (id, tenant_id, phone, pin_hash, full_name, worker_code, role)
+         VALUES ($1, $2, '+998901111111', 'hash', 'Duplicate phone', 'W-DUP', 'WORKER')`,
+        [randomUUID(), tenantB],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
   it('returns no tenant rows when tenant context is absent', async () => {
     await app.query(`SELECT set_config('app.current_tenant_id', '', false)`);
 

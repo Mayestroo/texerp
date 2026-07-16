@@ -50,7 +50,7 @@ export class CreateIdentityFoundation1752660000000
         CONSTRAINT users_language_check CHECK (language IN ('uz', 'ru')),
         CONSTRAINT users_failed_login_attempts_check CHECK (failed_login_attempts >= 0),
         UNIQUE (tenant_id, id),
-        UNIQUE (tenant_id, phone),
+        UNIQUE (phone),
         UNIQUE (tenant_id, worker_code),
         FOREIGN KEY (tenant_id, deactivated_by) REFERENCES users(tenant_id, id),
         FOREIGN KEY (tenant_id, created_by) REFERENCES users(tenant_id, id)
@@ -101,7 +101,7 @@ export class CreateIdentityFoundation1752660000000
         id uuid PRIMARY KEY,
         tenant_id uuid NOT NULL REFERENCES tenants(id),
         user_id uuid NOT NULL,
-        refresh_token_hash varchar(255) NOT NULL,
+        refresh_token_hash varchar(255) NOT NULL UNIQUE,
         device_fingerprint varchar(255),
         ip_address inet,
         user_agent varchar(500),
@@ -109,6 +109,7 @@ export class CreateIdentityFoundation1752660000000
         revoked_at timestamptz,
         revoked_reason varchar(100),
         created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (tenant_id, id),
         FOREIGN KEY (tenant_id, user_id) REFERENCES users(tenant_id, id)
       );
       CREATE INDEX user_sessions_active_user_idx
