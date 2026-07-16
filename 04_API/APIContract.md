@@ -209,7 +209,7 @@ Authenticate with phone number and PIN. Returns tokens.
 {
   "success": true,
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refresh_token": "rt_01J5K4M8N9P0Q1R2S3T4U5V6W7_opaque",
     "expires_in": 900,
     "user": {
@@ -238,8 +238,8 @@ Authenticate with phone number and PIN. Returns tokens.
 |------|:----:|-----------|
 | `INVALID_CREDENTIALS` | 401 | Wrong phone or PIN |
 | `ACCOUNT_DEACTIVATED` | 403 | User is deactivated |
-| `ACCOUNT_LOCKED` | 429 | 5 failed attempts; includes `retry_after_seconds` |
-| `TENANT_SUSPENDED` | 403 | Organization is suspended |
+| `ACCOUNT_LOCKED` | 429 | Correct credentials for an account locked after 5 failures; includes `retry_after_seconds` |
+| `TENANT_SUSPENDED` | 403 | Tenant is suspended |
 
 ---
 
@@ -264,6 +264,7 @@ Exchange a refresh token for a new access token.
   "success": true,
   "data": {
     "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "rt_01J5K4M8N9P0Q1R2S3T4U5V6W8_opaque",
     "expires_in": 900
   }
 }
@@ -519,11 +520,11 @@ List all users in the tenant.
 |-------|------|:-------:|---------|
 | `role` | string | all | `WORKER`, `FOREMAN`, `ACCOUNTANT`, `DIRECTOR` |
 | `status` | string | `ACTIVE` | `ACTIVE`, `DEACTIVATED`, `ALL` |
-| `department_id` | UUIDv7 | — | Filter by department |
-| `foreman_id` | UUIDv7 | — | Filter workers by foreman |
-| `search` | string | — | Search by name or worker_code |
+| `search` | string | — | Case-insensitive partial match on full name or worker code |
 | `page` | integer | 1 | |
 | `limit` | integer | 50 | max 200 |
+
+`department_id` and `foreman_id` filters are deferred to the Foreman Assignment slice and are currently rejected with HTTP 400 validation errors. Results are ordered by `full_name` ascending, then `id` ascending.
 
 **Response 200:**
 
@@ -543,9 +544,17 @@ List all users in the tenant.
       "foreman": { "id": "...", "full_name": "Akbar Toshmatov" }
     }
   ],
-  "pagination": { ... }
+  "pagination": {
+    "page": 1,
+    "limit": 50,
+    "total": 1,
+    "total_pages": 1,
+    "has_next": false
+  }
 }
 ```
+
+The default listing contains only active Users. `status=ALL` includes both active and deactivated Users.
 
 ---
 
@@ -563,21 +572,21 @@ Create a new user account.
   "phone": "+998901234568",
   "worker_code": "W-0043",
   "role": "WORKER",
-  "department_id": "01J5K...",
-  "foreman_id": "01J5K...",
-  "initial_pin": "4321"
+  "initial_pin": "4321",
+  "language": "uz"
 }
 ```
 
 | Field | Type | Required | Notes |
 |-------|------|:--------:|-------|
 | `full_name` | string | ✅ | |
-| `phone` | string | ✅ | Must be unique in tenant |
-| `worker_code` | string | ✅ | Must be unique in tenant |
+| `phone` | string | ✅ | Must be globally unique across all Tenants |
+| `worker_code` | string | ✅ | Must be unique within the Tenant |
 | `role` | enum | ✅ | WORKER, FOREMAN, ACCOUNTANT |
-| `department_id` | UUIDv7 | ❌ | Required for WORKER and FOREMAN |
-| `foreman_id` | UUIDv7 | ❌ | Required for WORKER role |
 | `initial_pin` | string | ✅ | 4 digits |
+| `language` | enum | ❌ | `uz` or `ru`; defaults to `uz` |
+
+`department_id` and `foreman_id` are deferred to the Foreman Assignment slice. They are not accepted by this endpoint and are rejected with HTTP 400 validation errors.
 
 **Response 201:**
 
@@ -594,7 +603,9 @@ Create a new user account.
 }
 ```
 
-**Errors:** `PHONE_ALREADY_EXISTS` (409) · `WORKER_CODE_ALREADY_EXISTS` (409) · `FOREMAN_NOT_FOUND` (404)
+**Errors:** `PHONE_ALREADY_EXISTS` (409) · `WORKER_CODE_ALREADY_EXISTS` (409) · `CANNOT_CREATE_DIRECTOR` (400) · HTTP 400 request validation
+
+Creating another Director is not allowed and returns `CANNOT_CREATE_DIRECTOR` (400).
 
 ---
 
@@ -605,6 +616,8 @@ Get a single user's profile.
 **Auth required:** Yes · **Roles:** DIRECTOR (any user); FOREMAN (own team only); ACCOUNTANT (any)
 
 **Response 200:** Same structure as `GET /users/me` but for specified user.
+
+A Foreman can read their own profile or a Worker with an active Foreman Assignment to them. Missing, cross-Tenant, and out-of-scope User IDs all return `USER_NOT_FOUND` (404).
 
 ---
 
@@ -619,20 +632,22 @@ Update user info.
 ```json
 {
   "full_name": "Malika Yusupova-Nazarova",
-  "department_id": "01J5K...",
-  "foreman_id": "01J5K..."
+  "language": "ru",
+  "avatar_url": "https://storage.texerp.uz/avatars/tenant123/user456.jpg"
 }
 ```
 
-**Note:** `phone`, `worker_code`, `role` changes are NOT allowed after creation.
+Only `full_name`, `language`, and nullable `avatar_url` are mutable. `phone`, `worker_code`, `role`, `status`, `department_id`, and `foreman_id` are immutable or managed by another workflow; supplying any of them is rejected with an HTTP 400 validation error. An empty object is rejected with `EMPTY_UPDATE` (400). A non-empty request containing only unchanged values succeeds without writing an audit event or updating the User.
 
-**Response 200:** Updated user object.
+**Response 200:** Updated complete profile (same structure as `GET /users/:id`).
+
+**Errors:** `USER_NOT_FOUND` (404) · `EMPTY_UPDATE` (400) · HTTP 400 request validation
 
 ---
 
 ### `POST /users/:id/deactivate`
 
-Deactivate a user. Revokes all sessions.
+Deactivate a User and revoke their sessions. `sessions_revoked` is the exact number of unrevoked, unexpired sessions active immediately before deactivation.
 
 **Auth required:** Yes · **Roles:** DIRECTOR
 
@@ -662,6 +677,10 @@ Reactivate a deactivated user.
 ```json
 { "success": true, "data": { "message": "Foydalanuvchi faollashtirildi" } }
 ```
+
+Reactivation clears the User's deactivation metadata but does not restore revoked sessions. The User must log in again.
+
+**Errors:** `USER_NOT_FOUND` (404) · `USER_ALREADY_ACTIVE` (400)
 
 ---
 
@@ -1996,7 +2015,7 @@ Update organization settings.
 | `INVALID_CREDENTIALS` | 401 | Wrong phone or PIN |
 | `ACCOUNT_DEACTIVATED` | 403 | User account deactivated |
 | `ACCOUNT_LOCKED` | 429 | Too many failed login attempts |
-| `TENANT_SUSPENDED` | 403 | Organization suspended |
+| `TENANT_SUSPENDED` | 403 | Tenant suspended |
 | `TOKEN_EXPIRED` | 401 | JWT access token expired |
 | `TOKEN_INVALID` | 401 | JWT signature invalid or malformed |
 | `REFRESH_TOKEN_EXPIRED` | 401 | Refresh token expired |
@@ -2010,11 +2029,14 @@ Update organization settings.
 | `OTP_MAX_ATTEMPTS` | 429 | Too many OTP verification attempts |
 | `OTP_RATE_LIMITED` | 429 | Too many OTP send requests |
 | `PHONE_NOT_FOUND` | 404 | Phone not registered |
-| `PHONE_ALREADY_EXISTS` | 409 | Phone already in use in this tenant |
-| `WORKER_CODE_ALREADY_EXISTS` | 409 | Worker code already in use |
-| `USER_NOT_FOUND` | 404 | User ID not found |
+| `PHONE_ALREADY_EXISTS` | 409 | Phone already registered globally |
+| `WORKER_CODE_ALREADY_EXISTS` | 409 | Worker code already in use within the Tenant |
+| `CANNOT_CREATE_DIRECTOR` | 400 | A Director cannot create another Director |
+| `EMPTY_UPDATE` | 400 | No mutable User fields supplied |
+| `USER_NOT_FOUND` | 404 | User absent, cross-Tenant, or outside Foreman visibility |
 | `CANNOT_DEACTIVATE_SELF` | 400 | Director cannot deactivate own account |
 | `USER_ALREADY_DEACTIVATED` | 400 | User already deactivated |
+| `USER_ALREADY_ACTIVE` | 400 | User already active |
 | `OPERATION_NOT_FOUND` | 404 | Operation ID not found |
 | `OPERATION_INACTIVE` | 400 | Submitting against inactive operation |
 | `DATE_OUT_OF_WINDOW` | 400 | record_date outside allowed range |

@@ -76,7 +76,7 @@ The system is divided into 8 bounded contexts. Each context is independent in it
 | Aggregate Root | Internal Entities | Invariants Enforced |
 |---------------|------------------|---------------------|
 | `Tenant` | `TenantSubscription`, `TenantFeatureFlag` | One active subscription at a time; feature flags per tenant |
-| `User` | `DeviceToken`, `UserSession` | One role per tenant; phone unique within tenant |
+| `User` | `DeviceToken`, `UserSession` | One role; phone globally unique in MVP (ADR-009) |
 | `ForemanAssignment` | — | Worker assigned to exactly one foreman at a time |
 | `Operation` | `OperationPriceHistory` | Active/inactive state; price history immutable |
 | `ProductionRecord` | `ProductionRecordAuditEntry` | Status transitions are strictly ordered; price snapshot captured on creation |
@@ -225,7 +225,7 @@ The system is divided into 8 bounded contexts. Each context is independent in it
 | `tenant_id` | UUIDv7 | FK → tenants; NULL for Super Admin |
 | `worker_code` | varchar(20) | Auto-generated (e.g., "W-0042"); unique per tenant |
 | `full_name` | varchar(255) | |
-| `phone` | varchar(30) | E.164; unique per tenant |
+| `phone` | varchar(30) | E.164; globally unique in MVP |
 | `role` | enum | WORKER / FOREMAN / ACCOUNTANT / WAREHOUSE / DIRECTOR / SUPER_ADMIN |
 | `status` | enum | ACTIVE / DEACTIVATED |
 | `language` | varchar(10) | "uz" / "ru" |
@@ -246,7 +246,7 @@ The system is divided into 8 bounded contexts. Each context is independent in it
 | `updated_at` | timestamptz | |
 
 **Constraints:**
-- UNIQUE (tenant_id, phone) — phone unique within tenant
+- UNIQUE (phone) — phone globally identifies one MVP user (ADR-009)
 - UNIQUE (tenant_id, worker_code)
 - CHECK: if role = SUPER_ADMIN then tenant_id IS NULL
 - CHECK: if role != SUPER_ADMIN then tenant_id IS NOT NULL

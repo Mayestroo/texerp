@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
+import { HttpExceptionFilter } from '../http/http-exception.filter';
 
 export function configureApp(app: INestApplication): void {
   app.use(helmet());
@@ -25,4 +26,5 @@ export function configureApp(app: INestApplication): void {
       whitelist: true,
     }),
   );
+  app.useGlobalFilters(new HttpExceptionFilter());
 }

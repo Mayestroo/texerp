@@ -81,7 +81,7 @@
 | `deactivated_by` | UUIDv7 | Who deactivated (Director's user ID) |
 
 **Key rules:**
-- Phone number is unique within a Tenant (not globally)
+- Phone number is globally unique in MVP; one User belongs to exactly one Tenant
 - PIN is 4 digits; minimum security for factory floor use
 - A deactivated user cannot log in; their historical records are preserved
 - One user = one role; no multi-role users in MVP

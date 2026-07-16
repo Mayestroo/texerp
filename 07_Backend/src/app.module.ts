@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { configuration, validationSchema } from './shared/config/configuration';
 import { HealthModule } from './modules/health/health.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
+import { IamModule } from './modules/iam/iam.module';
+import { RedisModule } from './infrastructure/redis/redis.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { DatabaseModule } from './infrastructure/database/database.module';
       }),
     }),
     DatabaseModule,
+    RedisModule,
+    IamModule,
     HealthModule,
   ],
 })
