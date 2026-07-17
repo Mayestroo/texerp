@@ -28,6 +28,37 @@ interface OperationListBody {
   data: OperationView[];
 }
 
+interface OperationUpdateView extends OperationView {
+  price_changed: boolean;
+  old_price?: number;
+  new_price?: number;
+  effective_from?: string;
+}
+
+interface OperationUpdateBody {
+  data: OperationUpdateView;
+}
+
+interface AuditCountRow {
+  count: string;
+}
+
+interface PriceHistoryRow {
+  unit_price: number;
+  effective_from: Date;
+  effective_to: Date | null;
+}
+
+interface AuditEventRow {
+  action: string;
+  before_state?: Record<string, unknown>;
+  after_state?: Record<string, unknown>;
+}
+
+interface OperationStateRow {
+  is_active: boolean;
+}
+
 describe('Operations Catalog', () => {
   const admin = new Client({
     connectionString:
@@ -373,4 +404,387 @@ describe('Operations Catalog', () => {
       })
       .expect(400);
   });
+
+  it('changes a price, closes the previous rate interval, and writes an OPERATION_PRICE_CHANGED audit', async () => {
+    const updated = await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ unit_price: 46_000 })
+      .expect(200);
+
+    const body = updated.body as OperationUpdateBody;
+    expect(body.data).toMatchObject({
+      id: mutableOperationId,
+      unit_price: 46_000,
+      price_changed: true,
+      old_price: 45_000,
+      new_price: 46_000,
+    });
+    expect(body.data.effective_from).toMatch(/\d{4}-/);
+
+    const history = await admin.query<PriceHistoryRow>(
+      `SELECT unit_price, effective_from, effective_to
+       FROM operation_price_history
+       WHERE operation_id = $1
+       ORDER BY effective_from ASC`,
+      [mutableOperationId],
+    );
+    expect(history.rows).toHaveLength(2);
+    expect(history.rows[0].unit_price).toBe(45_000);
+    expect(history.rows[0].effective_to).toBeInstanceOf(Date);
+    expect(history.rows[0].effective_to).toEqual(history.rows[1].effective_from);
+    expect(history.rows[1]).toMatchObject({
+      unit_price: 46_000,
+      effective_to: null,
+    });
+
+    const audits = await admin.query<AuditEventRow>(
+      `SELECT action FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2`,
+      [tenantId, mutableOperationId],
+    );
+    expect(audits.rows.map(({ action }) => action)).toContain(
+      'OPERATION_PRICE_CHANGED',
+    );
+    expect(audits.rows.map(({ action }) => action)).not.toContain(
+      'OPERATION_UPDATED',
+    );
+  });
+
+  it('updates metadata only and writes an OPERATION_UPDATED audit', async () => {
+    const updated = await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ name: 'Mutable Updated', sort_order: 5 })
+      .expect(200);
+
+    const body = updated.body as OperationUpdateBody;
+    expect(body.data).toMatchObject({
+      id: mutableOperationId,
+      name: 'Mutable Updated',
+      sort_order: 5,
+      unit_price: 46_000,
+      price_changed: false,
+    });
+    expect(body.data.old_price).toBeUndefined();
+    expect(body.data.new_price).toBeUndefined();
+    expect(body.data.effective_from).toBeUndefined();
+
+    const audits = await admin.query<AuditEventRow>(
+      `SELECT action, before_state, after_state FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_UPDATED'`,
+      [tenantId, mutableOperationId],
+    );
+    expect(audits.rows).toHaveLength(1);
+    expect(audits.rows[0].before_state).toMatchObject({ name: 'Mutable' });
+    expect(audits.rows[0].after_state).toMatchObject({
+      name: 'Mutable Updated',
+      sort_order: 5,
+    });
+
+    const history = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM operation_price_history WHERE operation_id = $1`,
+      [mutableOperationId],
+    );
+    expect(history.rows[0].count).toBe('2');
+  });
+
+  it('returns the current representation with no audit on a no-op update', async () => {
+    const beforeAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2`,
+      [tenantId, mutableOperationId],
+    );
+
+    const updated = await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ name: 'Mutable Updated', sort_order: 5, unit_price: 46_000 })
+      .expect(200);
+
+    const body = updated.body as OperationUpdateBody;
+    expect(body.data).toMatchObject({
+      id: mutableOperationId,
+      name: 'Mutable Updated',
+      sort_order: 5,
+      unit_price: 46_000,
+      price_changed: false,
+    });
+
+    const afterAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2`,
+      [tenantId, mutableOperationId],
+    );
+    expect(afterAudits.rows[0].count).toBe(beforeAudits.rows[0].count);
+  });
+
+  it('rejects an empty patch with EMPTY_UPDATE', async () => {
+    const response = await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({})
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      success: false,
+      error: { code: 'EMPTY_UPDATE' },
+    });
+  });
+
+  it('rejects unit and is_active through whitelist validation', async () => {
+    await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ name: 'Rename', unit: 'METER' })
+      .expect(400);
+    await request(server)
+      .patch(`/api/v1/operations/${mutableOperationId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ name: 'Rename', is_active: false })
+      .expect(400);
+  });
+
+  it('returns OPERATION_NOT_FOUND for missing or cross-tenant ids', async () => {
+    for (const id of [randomUUID(), secondTenantOperationId]) {
+      const response = await request(server)
+        .patch(`/api/v1/operations/${id}`)
+        .set('Authorization', `Bearer ${directorToken}`)
+        .send({ name: 'Not Found' })
+        .expect(404);
+      expect(response.body).toMatchObject({
+        success: false,
+        error: { code: 'OPERATION_NOT_FOUND' },
+      });
+    }
+  });
+
+  it('returns OPERATION_NOT_FOUND for cross-tenant activate/deactivate', async () => {
+    for (const route of ['activate', 'deactivate']) {
+      const response = await request(server)
+        .post(`/api/v1/operations/${secondTenantOperationId}/${route}`)
+        .set('Authorization', `Bearer ${directorToken}`)
+        .send({})
+        .expect(404);
+      expect(response.body).toMatchObject({
+        success: false,
+        error: { code: 'OPERATION_NOT_FOUND' },
+      });
+    }
+
+    // Verify no state change occurred
+    const operation = await admin.query<{ is_active: boolean }>(
+      `SELECT is_active FROM operations WHERE id = $1`,
+      [secondTenantOperationId],
+    );
+    expect(operation.rows[0].is_active).toBe(true);
+  });
+
+  it('emits one OPERATION_PRICE_CHANGED audit with all fields for a combined name-and-price patch', async () => {
+    const patchId = randomUUID();
+    await admin.query(
+      `INSERT INTO operations (id, tenant_id, name, code, unit, unit_price, sort_order, created_by)
+       VALUES ($1, $2, 'Combined Patch Op', 'CPO', 'PIECE', 100, 0, $3)`,
+      [patchId, tenantId, directorId],
+    );
+    await admin.query(
+      `INSERT INTO operation_price_history (id, tenant_id, operation_id, unit_price, effective_from, changed_by)
+       VALUES (gen_random_uuid(), $1, $2, 100, now(), $3)`,
+      [tenantId, patchId, directorId],
+    );
+
+    const updated = await request(server)
+      .patch(`/api/v1/operations/${patchId}`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({ name: 'Combined Renamed', unit_price: 200 })
+      .expect(200);
+
+    expect((updated.body as OperationUpdateBody).data.price_changed).toBe(true);
+
+    const audits = await admin.query<{
+      action: string;
+      before_state: Record<string, unknown>;
+      after_state: Record<string, unknown>;
+    }>(
+      `SELECT action, before_state, after_state FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2
+       ORDER BY occurred_at ASC`,
+      [tenantId, patchId],
+    );
+
+    expect(audits.rows).toHaveLength(1);
+    expect(audits.rows[0].action).toBe('OPERATION_PRICE_CHANGED');
+    expect(audits.rows[0].before_state).toMatchObject({
+      unit_price: 100,
+      name: 'Combined Patch Op',
+    });
+    expect(audits.rows[0].after_state).toMatchObject({
+      unit_price: 200,
+      name: 'Combined Renamed',
+    });
+  });
+
+  it('denies non-Directors update and lifecycle endpoints', async () => {
+    for (const token of [workerToken, foremanToken, accountantToken]) {
+      await request(server)
+        .patch(`/api/v1/operations/${mutableOperationId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Denied' })
+        .expect(403);
+      await request(server)
+        .post(`/api/v1/operations/${mutableOperationId}/deactivate`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(403);
+      await request(server)
+        .post(`/api/v1/operations/${mutableOperationId}/activate`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(403);
+    }
+  });
+
+  it('deactivates an active operation and writes OPERATION_DEACTIVATED', async () => {
+    await request(server)
+      .post(`/api/v1/operations/${createdOperationId}/deactivate`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({})
+      .expect(200);
+
+    const operation = await admin.query<OperationStateRow>(
+      `SELECT is_active FROM operations WHERE id = $1`,
+      [createdOperationId],
+    );
+    expect(operation.rows[0].is_active).toBe(false);
+
+    const audits = await admin.query<AuditEventRow>(
+      `SELECT action FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_DEACTIVATED'`,
+      [tenantId, createdOperationId],
+    );
+    expect(audits.rows).toHaveLength(1);
+  });
+
+  it('deactivate is idempotent when the operation is already inactive', async () => {
+    const beforeAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_DEACTIVATED'`,
+      [tenantId, inactiveOperationId],
+    );
+
+    await request(server)
+      .post(`/api/v1/operations/${inactiveOperationId}/deactivate`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({})
+      .expect(200);
+
+    const afterAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_DEACTIVATED'`,
+      [tenantId, inactiveOperationId],
+    );
+    expect(afterAudits.rows[0].count).toBe(beforeAudits.rows[0].count);
+  });
+
+  it('activates an inactive operation and writes OPERATION_ACTIVATED', async () => {
+    await request(server)
+      .post(`/api/v1/operations/${inactiveOperationId}/activate`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({})
+      .expect(200);
+
+    const operation = await admin.query<OperationStateRow>(
+      `SELECT is_active FROM operations WHERE id = $1`,
+      [inactiveOperationId],
+    );
+    expect(operation.rows[0].is_active).toBe(true);
+
+    const audits = await admin.query<AuditEventRow>(
+      `SELECT action FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_ACTIVATED'`,
+      [tenantId, inactiveOperationId],
+    );
+    expect(audits.rows).toHaveLength(1);
+  });
+
+  it('activate is idempotent when the operation is already active', async () => {
+    const beforeAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_ACTIVATED'`,
+      [tenantId, firstActiveOperationId],
+    );
+
+    await request(server)
+      .post(`/api/v1/operations/${firstActiveOperationId}/activate`)
+      .set('Authorization', `Bearer ${directorToken}`)
+      .send({})
+      .expect(200);
+
+    const afterAudits = await admin.query<AuditCountRow>(
+      `SELECT count(*)::text AS count FROM audit_events
+       WHERE tenant_id = $1 AND aggregate_type = 'OPERATION' AND aggregate_id = $2 AND action = 'OPERATION_ACTIVATED'`,
+      [tenantId, firstActiveOperationId],
+    );
+    expect(afterAudits.rows[0].count).toBe(beforeAudits.rows[0].count);
+  });
+
+  it('serializes concurrent price changes so only one rate interval is current', async () => {
+    const lockClient = new Client({
+      connectionString:
+        process.env.DATABASE_ADMIN_URL ??
+        'postgresql://texerp:texerp@localhost:5432/texerp',
+    });
+    try {
+      await lockClient.connect();
+      await lockClient.query('BEGIN');
+      await lockClient.query(
+        `SELECT id FROM operations WHERE id = $1 FOR UPDATE`,
+        [mutableOperationId],
+      );
+
+      const first = request(server)
+        .patch(`/api/v1/operations/${mutableOperationId}`)
+        .set('Authorization', `Bearer ${directorToken}`)
+        .send({ unit_price: 47_000 });
+      const second = request(server)
+        .patch(`/api/v1/operations/${mutableOperationId}`)
+        .set('Authorization', `Bearer ${directorToken}`)
+        .send({ unit_price: 48_000 });
+
+      // Wait for both requests to be blocked on the lock
+      for (let i = 0; i < 50; i++) {
+        const blocked = await admin.query<{ pid: number }>(
+          `SELECT pid FROM pg_stat_activity
+           WHERE state = 'active'
+             AND wait_event_type = 'Lock'
+             AND query ILIKE '%operations%'`,
+        );
+        if (blocked.rows.length >= 2) break;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      // Release the lock so both requests can proceed
+      await lockClient.query('COMMIT');
+
+      const [firstRes, secondRes] = await Promise.all([first, second]);
+      expect(firstRes.status).toBe(200);
+      expect(secondRes.status).toBe(200);
+
+      const history = await admin.query<PriceHistoryRow>(
+        `SELECT unit_price, effective_to
+         FROM operation_price_history
+         WHERE operation_id = $1
+         ORDER BY effective_from ASC`,
+        [mutableOperationId],
+      );
+      const currentIntervals = history.rows.filter(
+        ({ effective_to }) => effective_to === null,
+      );
+      expect(currentIntervals).toHaveLength(1);
+      expect([47_000, 48_000]).toContain(currentIntervals[0].unit_price);
+    } finally {
+      await lockClient.query('ROLLBACK').catch(() => undefined);
+      await lockClient.end().catch(() => undefined);
+    }
+  }, 15_000);
 });

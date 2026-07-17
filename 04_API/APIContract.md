@@ -884,9 +884,8 @@ List all operations in the tenant.
 
 | Param | Type | Default | Notes |
 |-------|------|:-------:|-------|
-| `status` | string | `ACTIVE` | `ACTIVE`, `INACTIVE`, `ALL` (Director only for ALL/INACTIVE) |
-| `category_id` | UUIDv7 | — | Filter by category |
-| `search` | string | — | Search by name or code |
+| `status` | string | `ACTIVE` | `ACTIVE`, `INACTIVE`, `ALL`. Only Directors may use `INACTIVE` or `ALL`. |
+| `search` | string | — | Search by name or code (case-insensitive) |
 
 **Response 200:**
 
@@ -898,10 +897,6 @@ List all operations in the tenant.
       "id": "01J5K...",
       "name": "Yoqa tikish",
       "code": "OP-001",
-      "category": {
-        "id": "01J5K...",
-        "name": "Yoqa operatsiyalari"
-      },
       "unit": "PIECE",
       "unit_price": 45000,
       "currency": "UZS",
@@ -912,32 +907,9 @@ List all operations in the tenant.
 }
 ```
 
+`unit_price` is a positive integer measured in tiyin (smallest currency unit). `currency` is always `UZS`.
+
 **Note for Workers:** Response includes only `ACTIVE` operations; `unit_price` included for price preview in Submit screen.
-
----
-
-### `GET /operations/recently-used`
-
-Get the current user's last 3 used operations.
-
-**Auth required:** Yes · **Roles:** WORKER
-
-**Response 200:**
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "01J5K...",
-      "name": "Yoqa tikish",
-      "unit": "PIECE",
-      "unit_price": 45000,
-      "last_used_at": "2026-07-15T17:30:00.000Z"
-    }
-  ]
-}
-```
 
 ---
 
@@ -953,7 +925,6 @@ Create an operation.
 {
   "name": "Qo'l tikish",
   "code": "OP-012",
-  "category_id": "01J5K...",
   "unit": "PIECE",
   "unit_price": 52000,
   "sort_order": 12
@@ -964,9 +935,9 @@ Create an operation.
 |-------|------|:--------:|-------|
 | `name` | string | ✅ | Unique in tenant |
 | `code` | string | ❌ | Unique if provided |
-| `category_id` | UUIDv7 | ❌ | |
-| `unit` | enum | ✅ | `PIECE`, `METER`, `PAIR` |
-| `unit_price` | integer | ✅ | In tiyin (smallest unit) |
+| `unit` | enum | ✅ | `PIECE`, `METER`, `PAIR`. Immutable after creation. |
+| `unit_price` | integer | ✅ | Positive integer, in tiyin |
+| `sort_order` | integer | ❌ | Default 0 |
 
 **Response 201:** Created operation object.
 
@@ -974,7 +945,9 @@ Create an operation.
 
 ### `PATCH /operations/:id`
 
-Update an operation. Price changes logged to history.
+Update an operation. Accepts only `name`, `code`, `unit_price`, and `sort_order`. The `unit` field is immutable — attempting to change it returns HTTP 400.
+
+Price changes are logged to history. A combined name-and-price patch produces one `OPERATION_PRICE_CHANGED` audit event containing all changed fields.
 
 **Auth required:** Yes · **Roles:** DIRECTOR
 
@@ -998,11 +971,13 @@ Update an operation. Price changes logged to history.
 }
 ```
 
+For metadata-only updates, `price_changed` is `false` and no price fields are included.
+
 ---
 
 ### `POST /operations/:id/deactivate`
 
-Deactivate an operation. Existing records unaffected.
+Deactivate an operation. Idempotent. Existing production records unaffected.
 
 **Auth required:** Yes · **Roles:** DIRECTOR
 
@@ -1012,7 +987,7 @@ Deactivate an operation. Existing records unaffected.
 
 ### `POST /operations/:id/activate`
 
-Reactivate an operation.
+Reactivate an operation. Idempotent.
 
 **Auth required:** Yes · **Roles:** DIRECTOR
 
@@ -1020,25 +995,12 @@ Reactivate an operation.
 
 ---
 
-### `GET /operation-categories`
+### Deferred
 
-List operation categories.
+The following endpoints are documented but not yet implemented:
 
-**Auth required:** Yes · **Roles:** All
-
-**Response 200:** Array of `{ id, name, sort_order, operation_count }`
-
----
-
-### `POST /operation-categories`
-
-Create a category.
-
-**Auth required:** Yes · **Roles:** DIRECTOR
-
-**Request:** `{ "name": "Yoqa operatsiyalari", "sort_order": 1 }`
-
-**Response 201:** Created category object.
+- `GET /operations/recently-used` — Worker's last 3 used operations. Depends on production entry submission (Sprint 2).
+- `GET /operation-categories` and `POST /operation-categories` — Operation category management. Deferred per product decision.
 
 ---
 

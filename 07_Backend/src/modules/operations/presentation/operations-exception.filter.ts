@@ -6,6 +6,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { EmptyOperationUpdateError } from '../application/errors/empty-operation-update.error';
 import { OperationCodeAlreadyExistsError } from '../application/errors/operation-code-already-exists.error';
 import { OperationNameAlreadyExistsError } from '../application/errors/operation-name-already-exists.error';
 import { OperationNotFoundError } from '../application/errors/operation-not-found.error';
@@ -13,12 +14,14 @@ import { OperationNotFoundError } from '../application/errors/operation-not-foun
 type OperationsApplicationError =
   | OperationNotFoundError
   | OperationNameAlreadyExistsError
-  | OperationCodeAlreadyExistsError;
+  | OperationCodeAlreadyExistsError
+  | EmptyOperationUpdateError;
 
 @Catch(
   OperationNotFoundError,
   OperationNameAlreadyExistsError,
   OperationCodeAlreadyExistsError,
+  EmptyOperationUpdateError,
 )
 @Injectable()
 export class OperationsExceptionFilter
@@ -32,6 +35,15 @@ export class OperationsExceptionFilter
         HttpStatus.NOT_FOUND,
         'OPERATION_NOT_FOUND',
         'Operatsiya topilmadi',
+      );
+      return;
+    }
+    if (exception instanceof EmptyOperationUpdateError) {
+      this.send(
+        response,
+        HttpStatus.BAD_REQUEST,
+        'EMPTY_UPDATE',
+        'Yangilash maydonlari berilmagan',
       );
       return;
     }
