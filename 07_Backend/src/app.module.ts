@@ -5,6 +5,7 @@ import { configuration, validationSchema } from './shared/config/configuration';
 import { HealthModule } from './modules/health/health.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { IamModule } from './modules/iam/iam.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 
@@ -29,6 +30,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     DatabaseModule,
     RedisModule,
     IamModule,
+    OperationsModule,
     OrganizationModule,
     HealthModule,
   ],
