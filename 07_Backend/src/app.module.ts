@@ -8,6 +8,7 @@ import { IamModule } from './modules/iam/iam.module';
 import { OperationsModule } from './modules/operations/operations.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { ProductionModule } from './modules/production/production.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     IamModule,
     OperationsModule,
     OrganizationModule,
+    ProductionModule,
     HealthModule,
   ],
 })
