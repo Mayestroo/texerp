@@ -36,5 +36,6 @@ import { UserExceptionFilter } from './presentation/user-exception.filter';
     RolesGuard,
     UserExceptionFilter,
   ],
+  exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class IamModule {}

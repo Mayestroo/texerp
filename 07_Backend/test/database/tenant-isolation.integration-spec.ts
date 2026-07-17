@@ -21,6 +21,8 @@ describe('PostgreSQL tenant isolation', () => {
   const foremanB = randomUUID();
   const departmentA = randomUUID();
   const departmentB = randomUUID();
+  const foremanAssignmentA = randomUUID();
+  const foremanAssignmentB = randomUUID();
   const auditEvent = randomUUID();
   const auditEventB = randomUUID();
 
@@ -63,12 +65,12 @@ describe('PostgreSQL tenant isolation', () => {
         ($1, $2, $3, $4, $5, $4),
         ($6, $7, $8, $9, $10, $9)`,
       [
-        randomUUID(),
+        foremanAssignmentA,
         tenantA,
         userA,
         foremanA,
         departmentA,
-        randomUUID(),
+        foremanAssignmentB,
         tenantB,
         userB,
         foremanB,
@@ -156,6 +158,38 @@ describe('PostgreSQL tenant isolation', () => {
           (id, tenant_id, phone, pin_hash, full_name, worker_code, role)
          VALUES ($1, $2, '+998903333333', 'hash', 'Intruder', 'W-X', 'WORKER')`,
         [randomUUID(), tenantB],
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('isolates Department and Foreman Assignment reads and writes for the runtime role', async () => {
+    await app.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [
+      tenantA,
+    ]);
+
+    const departments = await app.query<{ id: string }>(
+      'SELECT id FROM departments',
+    );
+    const assignments = await app.query<{ id: string }>(
+      'SELECT id FROM foreman_assignments',
+    );
+    expect(departments.rows).toEqual([{ id: departmentA }]);
+    expect(assignments.rows).toEqual([{ id: foremanAssignmentA }]);
+
+    await expect(
+      app.query(
+        `INSERT INTO departments (id, tenant_id, name, code, foreman_id)
+         VALUES ($1, $2, 'Cross-tenant Department', $3, $4)`,
+        [randomUUID(), tenantB, `X-${randomUUID().slice(0, 8)}`, foremanB],
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      app.query(
+        `INSERT INTO foreman_assignments
+          (id, tenant_id, worker_id, foreman_id, department_id, assigned_by,
+           unassigned_at)
+         VALUES ($1, $2, $3, $4, $5, $4, now() + interval '1 second')`,
+        [randomUUID(), tenantB, userB, foremanB, departmentB],
       ),
     ).rejects.toMatchObject({ code: '42501' });
   });

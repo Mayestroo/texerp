@@ -101,17 +101,16 @@ X-Platform: android          (or 'ios')
 }
 ```
 
-### Validation Error Response (422)
+### Validation Error Response (400)
 
 ```json
 {
   "success": false,
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Kiritilgan ma'lumotlar noto'g'ri",
-    "details": [
-      { "field": "quantity", "message": "Miqdor 1 dan 9999 gacha bo'lishi kerak" },
-      { "field": "operation_id", "message": "Operatsiya tanlanmagan" }
+    "message": [
+      "name must be longer than or equal to 1 characters",
+      "foreman_id must be a UUID"
     ]
   }
 }
@@ -524,7 +523,7 @@ List all users in the tenant.
 | `page` | integer | 1 | |
 | `limit` | integer | 50 | max 200 |
 
-`department_id` and `foreman_id` filters are deferred to the Foreman Assignment slice and are currently rejected with HTTP 400 validation errors. Results are ordered by `full_name` ascending, then `id` ascending.
+`department_id` and `foreman_id` filters remain deferred and are rejected with HTTP 400 validation errors. Results are ordered by `full_name` ascending, then `id` ascending.
 
 **Response 200:**
 
@@ -586,7 +585,7 @@ Create a new user account.
 | `initial_pin` | string | ✅ | 4 digits |
 | `language` | enum | ❌ | `uz` or `ru`; defaults to `uz` |
 
-`department_id` and `foreman_id` are deferred to the Foreman Assignment slice. They are not accepted by this endpoint and are rejected with HTTP 400 validation errors.
+Assignment during User creation remains deferred. `department_id` and `foreman_id` are not accepted by this endpoint and are rejected with HTTP 400 validation errors; use the dedicated Foreman Assignment endpoint after creating the User.
 
 **Response 201:**
 
@@ -684,15 +683,110 @@ Reactivation clears the User's deactivation metadata but does not restore revoke
 
 ---
 
+### `PUT /users/:workerId/foreman-assignment`
+
+Assign or reassign an active Worker to a Department. The Department's current designated Foreman is recorded on the Foreman Assignment.
+
+**Auth required:** Yes · **Roles:** DIRECTOR
+
+**Request:**
+
+```json
+{ "department_id": "01J5K..." }
+```
+
+`workerId` and `department_id` must be UUIDs. The body must contain `department_id` and no unknown fields. The Worker and Department must be active and belong to the authenticated Tenant. The Department must have an active designated Foreman.
+
+**Response 200:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "01J5K...",
+    "worker": { "id": "01J5K...", "full_name": "Aziz Karimov" },
+    "department": { "id": "01J5K...", "name": "Tikarish Line 1", "code": "L1" },
+    "foreman": { "id": "01J5K...", "full_name": "Akbar Toshmatov" },
+    "assigned_at": "2026-07-16T10:30:00.000Z"
+  }
+}
+```
+
+Selecting the Department and Foreman already recorded by the active Foreman Assignment is idempotent and returns that assignment unchanged. Reassignment sets `unassigned_at` on the current row and creates a new row; other historical values are not rewritten. Changing a Department's designated Foreman affects future assignments only.
+
+**Errors:** `WORKER_NOT_FOUND` (404) · `DEPARTMENT_NOT_FOUND` (404) · `DEPARTMENT_HAS_NO_FOREMAN` (400) · `FORBIDDEN` (403) · `VALIDATION_ERROR` (400)
+
+Missing, cross-Tenant, inactive, and wrong-role Worker IDs return `WORKER_NOT_FOUND`. Missing, cross-Tenant, and inactive Department IDs return `DEPARTMENT_NOT_FOUND`.
+
+---
+
+### `DELETE /users/:workerId/foreman-assignment`
+
+End an active Worker's Foreman Assignment.
+
+**Auth required:** Yes · **Roles:** DIRECTOR
+
+`workerId` must be a UUID and identify an active Worker in the authenticated Tenant. The operation is idempotent when the Worker has no active Foreman Assignment.
+
+**Response 200:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Ishchi brigadirdan ajratildi" }
+}
+```
+
+Only the active Foreman Assignment's `unassigned_at` is updated; historical rows are retained.
+
+**Errors:** `WORKER_NOT_FOUND` (404) · `FORBIDDEN` (403) · `VALIDATION_ERROR` (400)
+
+---
+
+### `GET /users/me/workers`
+
+List the authenticated Foreman's active Workers.
+
+**Auth required:** Yes · **Roles:** FOREMAN
+
+The result is not paginated. It contains active Workers whose active Foreman Assignment records the authenticated Foreman, ordered by `full_name` ascending and then `id` ascending.
+
+**Response 200:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "01J5K...",
+      "full_name": "Aziz Karimov",
+      "worker_code": "W-0042",
+      "phone": "+998901234567",
+      "role": "WORKER",
+      "status": "ACTIVE",
+      "avatar_url": null,
+      "department": { "id": "01J5K...", "name": "Tikarish Line 1" },
+      "foreman": { "id": "01J5K...", "full_name": "Akbar Toshmatov" }
+    }
+  ]
+}
+```
+
+**Errors:** `FORBIDDEN` (403)
+
+---
+
 ## 5. Departments Module
 
 ### `GET /departments`
 
 List all departments in the tenant.
 
-**Auth required:** Yes · **Roles:** All
+**Auth required:** Yes · **Roles:** DIRECTOR, ACCOUNTANT, FOREMAN, WORKER
 
-**Query:** `?include_inactive=false` (default)
+**Query:** `?include_inactive=false` (default). The only accepted values are `true` and `false`; unknown query parameters or other values return `VALIDATION_ERROR` (400).
+
+By default, only active Departments are returned. `include_inactive=true` includes active and inactive Departments. Results are ordered by `name` ascending and then `id` ascending. `worker_count` counts active Foreman Assignments recorded against the Department, including assignments whose recorded Foreman differs from the Department's current designated Foreman.
 
 **Response 200:**
 
@@ -715,6 +809,10 @@ List all departments in the tenant.
 }
 ```
 
+`foreman` is `null` only when the Department has no designated Foreman or the referenced User is absent. An inactive designated Foreman still appears in Department reads; assignment creation requires the Department to have an active designated Foreman. Changing User or Department state does not silently rewrite relationships, and assignment validation is the active-state boundary.
+
+**Errors:** `FORBIDDEN` (403) · `VALIDATION_ERROR` (400)
+
 ---
 
 ### `POST /departments`
@@ -733,7 +831,19 @@ Create a department.
 }
 ```
 
-**Response 201:** Created department object.
+| Field | Type | Required | Validation |
+|-------|------|:--------:|------------|
+| `name` | string | ✅ | 1–255 characters; unique within the Tenant |
+| `code` | string | ✅ | 1–30 characters; unique within the Tenant |
+| `foreman_id` | UUID | ✅ | Active FOREMAN in the authenticated Tenant |
+
+Unknown fields are rejected with `VALIDATION_ERROR` (400).
+
+**Response 201:** Created Department object in the same shape as `GET /departments`, with `is_active: true` and `worker_count: 0`.
+
+**Errors:** `FOREMAN_NOT_FOUND` (404) · `DEPARTMENT_NAME_ALREADY_EXISTS` (409) · `DEPARTMENT_CODE_ALREADY_EXISTS` (409) · `FORBIDDEN` (403) · `VALIDATION_ERROR` (400)
+
+An absent, cross-Tenant, inactive, or non-Foreman `foreman_id` returns `FOREMAN_NOT_FOUND`.
 
 ---
 
@@ -743,9 +853,22 @@ Update a department.
 
 **Auth required:** Yes · **Roles:** DIRECTOR
 
-**Request:** Partial update (name, code, foreman_id, is_active).
+**Request:** A non-empty partial update containing one or more of `name`, `code`, `foreman_id`, and `is_active`.
 
-**Response 200:** Updated department object.
+| Field | Type | Validation |
+|-------|------|------------|
+| `name` | string | 1–255 characters; unique within the Tenant |
+| `code` | string | 1–30 characters; unique within the Tenant |
+| `foreman_id` | UUID | Active FOREMAN in the authenticated Tenant; cannot remove the designated Foreman |
+| `is_active` | boolean | JSON boolean |
+
+The path `id` must be a UUID. Unknown fields and invalid values return `VALIDATION_ERROR` (400). An empty object returns `EMPTY_UPDATE` (400). A request containing only unchanged values succeeds without updating the Department or writing an audit event. Changing the designated Foreman does not rewrite existing active or historical Foreman Assignments. Deactivating a Department prevents new assignments but does not alter existing assignments.
+
+**Response 200:** Updated Department object in the same shape as `GET /departments`.
+
+**Errors:** `DEPARTMENT_NOT_FOUND` (404) · `FOREMAN_NOT_FOUND` (404) · `DEPARTMENT_NAME_ALREADY_EXISTS` (409) · `DEPARTMENT_CODE_ALREADY_EXISTS` (409) · `EMPTY_UPDATE` (400) · `FORBIDDEN` (403) · `VALIDATION_ERROR` (400)
+
+Missing and cross-Tenant Department IDs return `DEPARTMENT_NOT_FOUND`. An absent, cross-Tenant, inactive, or non-Foreman `foreman_id` returns `FOREMAN_NOT_FOUND`.
 
 ---
 
@@ -2003,7 +2126,6 @@ Update organization settings.
 | 403 | Forbidden (token valid but role insufficient) |
 | 404 | Not Found |
 | 409 | Conflict (duplicate, overlap) |
-| 422 | Unprocessable Entity (validation errors) |
 | 429 | Too Many Requests (rate limited) |
 | 500 | Internal Server Error |
 | 503 | Service Unavailable (maintenance) |
@@ -2032,8 +2154,14 @@ Update organization settings.
 | `PHONE_ALREADY_EXISTS` | 409 | Phone already registered globally |
 | `WORKER_CODE_ALREADY_EXISTS` | 409 | Worker code already in use within the Tenant |
 | `CANNOT_CREATE_DIRECTOR` | 400 | A Director cannot create another Director |
-| `EMPTY_UPDATE` | 400 | No mutable User fields supplied |
+| `EMPTY_UPDATE` | 400 | No mutable fields supplied for a User or Department update |
 | `USER_NOT_FOUND` | 404 | User absent, cross-Tenant, or outside Foreman visibility |
+| `WORKER_NOT_FOUND` | 404 | Assignment target is absent, cross-Tenant, inactive, or not a Worker |
+| `FOREMAN_NOT_FOUND` | 404 | Designated User is absent, cross-Tenant, inactive, or not a Foreman |
+| `DEPARTMENT_NOT_FOUND` | 404 | Department is absent, cross-Tenant, or unavailable for assignment |
+| `DEPARTMENT_HAS_NO_FOREMAN` | 400 | Department has no active designated Foreman |
+| `DEPARTMENT_NAME_ALREADY_EXISTS` | 409 | Department name already exists within the Tenant |
+| `DEPARTMENT_CODE_ALREADY_EXISTS` | 409 | Department code already exists within the Tenant |
 | `CANNOT_DEACTIVATE_SELF` | 400 | Director cannot deactivate own account |
 | `USER_ALREADY_DEACTIVATED` | 400 | User already deactivated |
 | `USER_ALREADY_ACTIVE` | 400 | User already active |
@@ -2054,7 +2182,8 @@ Update organization settings.
 | `PERIOD_ALREADY_FINALIZED` | 400 | Period already finalized |
 | `CONFIRMATION_REQUIRED` | 400 | `confirmed: true` not provided |
 | `WORKER_NOT_IN_PERIOD` | 400 | Worker has no calculation in this period |
-| `VALIDATION_ERROR` | 422 | Input validation failed (see `details` array) |
+| `FORBIDDEN` | 403 | Authenticated role is not permitted to use the endpoint |
+| `VALIDATION_ERROR` | 400 | Request path, query, or body validation failed |
 | `RESOURCE_NOT_FOUND` | 404 | Generic not found |
 | `INTERNAL_ERROR` | 500 | Unhandled server error |
 
@@ -2071,7 +2200,10 @@ Update organization settings.
 
 ---
 
-*End of API Contract — Version 1.0.0*  
-*Total endpoints: 52*  
-*Backend team implements; Flutter team calls; this document is the binding agreement between both.*  
+*End of API Contract — Version 1.0.0*
+
+*Total endpoints: 57*
+
+*Backend team implements; Flutter team calls; this document is the binding agreement between both.*
+
 *Version must increment for any breaking change. Additive changes (new optional fields) do not require version bump.*

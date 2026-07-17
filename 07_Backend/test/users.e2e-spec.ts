@@ -1837,30 +1837,32 @@ describe('Director User Management', () => {
     });
   });
 
-  it('rejects deferred department placement', async () => {
-    const response = await request(server)
-      .post('/api/v1/users')
-      .set('Authorization', `Bearer ${directorAccessToken}`)
-      .send({
-        full_name: 'Nodira Aliyeva',
-        phone: '+998901230002',
-        worker_code: 'W-0044',
-        role: 'WORKER',
-        initial_pin: '4321',
-        department_id: randomUUID(),
-      })
-      .expect(400);
+  it('rejects department_id and foreman_id as deferred User creation fields', async () => {
+    for (const deferredField of ['department_id', 'foreman_id'] as const) {
+      const response = await request(server)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${directorAccessToken}`)
+        .send({
+          full_name: 'Nodira Aliyeva',
+          phone: '+998901230002',
+          worker_code: 'W-0044',
+          role: 'WORKER',
+          initial_pin: '4321',
+          [deferredField]: randomUUID(),
+        })
+        .expect(400);
 
-    const body = response.body as ErrorEnvelopeBody;
-    expect(body).toMatchObject({
-      success: false,
-      error: { code: 'VALIDATION_ERROR' },
-    });
-    expect(body.error.message).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('department_id should not exist'),
-      ]),
-    );
+      const body = response.body as ErrorEnvelopeBody;
+      expect(body).toMatchObject({
+        success: false,
+        error: { code: 'VALIDATION_ERROR' },
+      });
+      expect(body.error.message).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining(`${deferredField} should not exist`),
+        ]),
+      );
+    }
   });
 
   it('rolls back the audit event when the User insert fails', async () => {
