@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/shared/placeholder_screen.dart';
@@ -73,6 +74,11 @@ class _RoleBasedShellState extends State<RoleBasedShell> {
             icon: const Icon(Icons.notifications_outlined),
             tooltip: l10n.notifications,
             onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: l10n.profile,
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
