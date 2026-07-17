@@ -4,6 +4,7 @@ import { TenantDatabase } from '../../../infrastructure/database/tenant-database
 import { uuidv7 } from '../../../shared/utils/uuid';
 import { AccessTokenClaims } from '../../iam/application/access-token-claims';
 import { CreateOperationEntryDto } from './dto/create-operation-entry.dto';
+import { ListMyEntriesQueryDto } from './dto/list-my-entries-query.dto';
 import { DateOutOfWindowError } from './errors/date-out-of-window.error';
 import { DuplicateEntryError } from './errors/duplicate-entry.error';
 import { OperationInactiveError } from './errors/operation-inactive.error';
@@ -181,6 +182,85 @@ export class ProductionEntriesService {
       this.mapUniqueViolation(error);
       throw error;
     }
+  }
+
+  async listMyEntries(
+    tenantId: string,
+    workerId: string,
+    query: ListMyEntriesQueryDto,
+  ): Promise<{ data: OperationEntryView[]; total: number }> {
+    return this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const conditions: string[] = ['pe.tenant_id = $1', 'pe.worker_id = $2'];
+      const params: unknown[] = [tenantId, workerId];
+      let paramIndex = 3;
+
+      if (query.status) {
+        conditions.push(`pe.status = $${paramIndex++}`);
+        params.push(query.status);
+      }
+      if (query.operation_id) {
+        conditions.push(`pe.operation_id = $${paramIndex++}`);
+        params.push(query.operation_id);
+      }
+      if (query.date_from) {
+        conditions.push(`pe.record_date >= $${paramIndex++}`);
+        params.push(query.date_from);
+      }
+      if (query.date_to) {
+        conditions.push(`pe.record_date <= $${paramIndex++}`);
+        params.push(query.date_to);
+      }
+
+      const whereClause = conditions.join(' AND ');
+
+      const countResult = await manager.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count
+         FROM production_entries pe
+         WHERE ${whereClause}`,
+        params,
+      );
+      const total = Number.parseInt(countResult[0].count, 10);
+
+      const entries = await manager.query<OperationEntryView[]>(
+        `SELECT
+           pe.id,
+           pe.status,
+           json_build_object(
+             'id', pe.operation_id,
+             'name', pe.operation_name_snapshot,
+             'unit', o.unit
+           ) AS operation,
+           pe.operation_name_snapshot,
+           pe.operation_code_snapshot,
+           pe.quantity AS quantity_submitted,
+           pe.unit_price_snapshot,
+           pe.currency_snapshot,
+           pe.record_date::text AS record_date,
+           pe.worker_note,
+           pe.created_at AS submitted_at,
+           CASE WHEN fa.id IS NULL THEN NULL
+             ELSE json_build_object('id', u.id, 'full_name', u.full_name)
+           END AS foreman
+         FROM production_entries pe
+         LEFT JOIN operations o
+           ON o.tenant_id = pe.tenant_id
+          AND o.id = pe.operation_id
+         LEFT JOIN foreman_assignments fa
+           ON fa.tenant_id = pe.tenant_id
+          AND fa.worker_id = pe.worker_id
+          AND fa.assigned_at <= pe.record_date::timestamptz
+          AND (fa.unassigned_at IS NULL OR fa.unassigned_at > pe.record_date::timestamptz)
+         LEFT JOIN users u
+           ON u.tenant_id = fa.tenant_id
+          AND u.id = fa.foreman_id
+         WHERE ${whereClause}
+         ORDER BY pe.record_date DESC, pe.created_at DESC
+         LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
+        [...params, query.limit, query.offset],
+      );
+
+      return { data: entries, total };
+    });
   }
 
   private async validateWorker(

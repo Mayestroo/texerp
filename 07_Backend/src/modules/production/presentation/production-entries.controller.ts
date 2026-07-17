@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   Post,
+  Query,
   Req,
   UseFilters,
   UseGuards,
@@ -14,6 +16,7 @@ import {
 import { Roles } from '../../iam/presentation/roles.decorator';
 import { RolesGuard } from '../../iam/presentation/roles.guard';
 import { CreateOperationEntryDto } from '../application/dto/create-operation-entry.dto';
+import { ListMyEntriesQueryDto } from '../application/dto/list-my-entries-query.dto';
 import {
   OperationEntryView,
   ProductionEntriesService,
@@ -43,5 +46,19 @@ export class ProductionEntriesController {
       { ipAddress: request.ip, userAgent: request.get('user-agent') },
     );
     return { success: true, data };
+  }
+
+  @Get('me')
+  @Roles('WORKER')
+  async listMyEntries(
+    @Query() query: ListMyEntriesQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: OperationEntryView[]; total: number }> {
+    const result = await this.productionEntriesService.listMyEntries(
+      request.user.tenant_id,
+      request.user.sub,
+      query,
+    );
+    return { success: true, ...result };
   }
 }
