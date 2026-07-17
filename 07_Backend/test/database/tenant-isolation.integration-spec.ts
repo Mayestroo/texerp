@@ -23,6 +23,10 @@ describe('PostgreSQL tenant isolation', () => {
   const departmentB = randomUUID();
   const foremanAssignmentA = randomUUID();
   const foremanAssignmentB = randomUUID();
+  const operationA = randomUUID();
+  const operationB = randomUUID();
+  const operationPriceA = randomUUID();
+  const operationPriceB = randomUUID();
   const auditEvent = randomUUID();
   const auditEventB = randomUUID();
 
@@ -85,10 +89,34 @@ describe('PostgreSQL tenant isolation', () => {
         ($4, $5, $6, 'hash-b', now() + interval '1 day')`,
       [randomUUID(), tenantA, userA, randomUUID(), tenantB, userB],
     );
+    await admin.query(
+      `INSERT INTO operations
+        (id, tenant_id, name, code, unit, unit_price, created_by)
+       VALUES
+        ($1, $2, 'Operation A', 'OP-A', 'PIECE', 45000, $3),
+        ($4, $5, 'Operation B', 'OP-B', 'PIECE', 55000, $6)`,
+      [operationA, tenantA, userA, operationB, tenantB, userB],
+    );
+    await admin.query(
+      `INSERT INTO operation_price_history
+        (id, tenant_id, operation_id, unit_price, effective_from, changed_by)
+       VALUES
+        ($1, $2, $3, 45000, now(), $4),
+        ($5, $6, $7, 55000, now(), $8)`,
+      [operationPriceA, tenantA, operationA, userA, operationPriceB, tenantB, operationB, userB],
+    );
   });
 
   afterAll(async () => {
     await admin.query('DELETE FROM audit_events WHERE tenant_id IN ($1, $2)', [
+      tenantA,
+      tenantB,
+    ]);
+    await admin.query(
+      'DELETE FROM operation_price_history WHERE tenant_id IN ($1, $2)',
+      [tenantA, tenantB],
+    );
+    await admin.query('DELETE FROM operations WHERE tenant_id IN ($1, $2)', [
       tenantA,
       tenantB,
     ]);
@@ -194,6 +222,30 @@ describe('PostgreSQL tenant isolation', () => {
     ).rejects.toMatchObject({ code: '42501' });
   });
 
+  it('isolates Operation and price-history reads and writes for the runtime role', async () => {
+    await app.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [
+      tenantA,
+    ]);
+
+    const operations = await app.query<{ id: string }>(
+      'SELECT id FROM operations ORDER BY id',
+    );
+    const prices = await app.query<{ operation_id: string }>(
+      'SELECT operation_id FROM operation_price_history ORDER BY operation_id',
+    );
+    expect(operations.rows).toEqual([{ id: operationA }]);
+    expect(prices.rows).toEqual([{ operation_id: operationA }]);
+
+    await expect(
+      app.query(
+        `INSERT INTO operations
+          (id, tenant_id, name, unit, unit_price, created_by)
+         VALUES ($1, $2, 'Cross-tenant operation', 'PIECE', 1, $3)`,
+        [randomUUID(), tenantB, userB],
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
+  });
+
   it('denies the runtime role access to the platform tenant catalog', async () => {
     await expect(app.query('SELECT id FROM tenants')).rejects.toMatchObject({
       code: '42501',
@@ -235,6 +287,8 @@ describe('PostgreSQL tenant isolation', () => {
     'foreman_assignments',
     'user_sessions',
     'audit_events',
+    'operations',
+    'operation_price_history',
   ])('isolates the %s table', async (table) => {
     await app.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [
       tenantA,
