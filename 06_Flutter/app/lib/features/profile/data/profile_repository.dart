@@ -11,9 +11,9 @@ class ProfileRepository {
   final ApiClient _apiClient;
 
   /// Fetches the current user profile.
-  Future<UserProfile> getProfile() async {
+  Future<UserProfile> getProfile(String userId) async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>('/users/me');
+      final response = await _apiClient.dio.get<Map<String, dynamic>>('/users/$userId');
       final data = response.data!['data'] as Map<String, dynamic>;
       return UserProfile.fromJson(data);
     } on DioException catch (e) {

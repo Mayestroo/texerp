@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:texerp/core/l10n/locale_cubit.dart';
 import 'package:texerp/features/auth/data/auth_models.dart';
+import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -18,7 +19,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    context.read<ProfileBloc>().add(const ProfileLoadRequested());
+    final userId = context.read<AuthBloc>().state.user?.id;
+    if (userId != null) {
+      context.read<ProfileBloc>().add(ProfileLoadRequested(userId: userId));
+    }
   }
 
   @override
@@ -314,7 +318,12 @@ class _ErrorView extends StatelessWidget {
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => context.read<ProfileBloc>().add(const ProfileLoadRequested()),
+            onPressed: () {
+              final userId = context.read<AuthBloc>().state.user?.id;
+              if (userId != null) {
+                context.read<ProfileBloc>().add(ProfileLoadRequested(userId: userId));
+              }
+            },
             child: Text(l10n.retry),
           ),
         ],

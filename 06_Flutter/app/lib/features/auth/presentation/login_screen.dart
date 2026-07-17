@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
-  final _phoneController = TextEditingController(text: '+998 ');
+  final _phoneController = TextEditingController(text: '');
   final _phoneFocusNode = FocusNode();
   final _pinFocusNode = FocusNode();
 
@@ -48,9 +48,7 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  String get _rawDigits => _phoneController.text
-      .replaceFirst('+998 ', '')
-      .replaceAll(RegExp(r'\D'), '');
+  String get _rawDigits => _phoneController.text.replaceAll(RegExp(r'\D'), '');
 
   bool get _phoneComplete => _rawDigits.length == 9;
   bool get _pinComplete => _pin.length == 4;
@@ -290,23 +288,17 @@ class _LanguageToggle extends StatelessWidget {
 }
 
 class _PhoneInputFormatter extends TextInputFormatter {
-  static const _prefix = '+998 ';
-
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (!newValue.text.startsWith(_prefix)) {
-      return oldValue;
-    }
-    final digits = newValue.text.substring(_prefix.length).replaceAll(RegExp(r'\D'), '');
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final limited = digits.substring(0, digits.length.clamp(0, 9));
     final formatted = _format(limited);
-    final text = '$_prefix$formatted';
     return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 

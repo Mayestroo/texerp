@@ -106,10 +106,10 @@ class UserProfile extends Equatable {
     return UserProfile(
       id: json['id'] as String,
       fullName: json['full_name'] as String,
-      phone: json['phone'] as String,
-      workerCode: json['worker_code'] as String,
+      phone: json['phone'] as String? ?? '',
+      workerCode: json['worker_code'] as String? ?? '',
       role: json['role'] as String,
-      status: json['status'] as String,
+      status: json['status'] as String? ?? 'ACTIVE',
       avatarUrl: json['avatar_url'] as String?,
       department: json['department'] == null
           ? null

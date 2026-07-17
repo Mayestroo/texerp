@@ -22,7 +22,7 @@ void main() {
   final localeCubit = LocaleCubit();
 
   final apiClient = ApiClient(
-    baseUrl: 'http://10.0.2.2:3000/api/v1',
+    baseUrl: 'http://192.168.43.103:3000/api/v1',
     secureStorage: secureStorage,
     tokenProvider: tokenProvider,
     localeCubit: localeCubit,

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -184,7 +186,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     try {
       final accessToken = await _authRepository.refreshToken(refreshToken);
-      final user = await _authRepository.getProfile();
+      // Decode user ID from JWT to fetch profile
+      final parts = accessToken.split('.');
+      final payload = String.fromCharCodes(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final userId = decoded['sub'] as String;
+      final user = await _authRepository.getProfile(userId);
       emit(AuthAuthenticated(user: user, accessToken: accessToken));
     } catch (_) {
       await _secureStorage.clearTokens();
@@ -204,7 +213,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     try {
       final accessToken = await _authRepository.refreshToken(refreshToken);
-      final user = state.user ?? await _authRepository.getProfile();
+      final parts = accessToken.split('.');
+      final payload = String.fromCharCodes(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+      final userId = decoded['sub'] as String;
+      final user = state.user ?? await _authRepository.getProfile(userId);
       emit(AuthAuthenticated(user: user, accessToken: accessToken));
     } catch (_) {
       await _secureStorage.clearTokens();

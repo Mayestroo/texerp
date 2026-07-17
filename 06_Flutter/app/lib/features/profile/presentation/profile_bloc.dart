@@ -21,7 +21,12 @@ abstract class ProfileEvent extends Equatable {
 }
 
 class ProfileLoadRequested extends ProfileEvent {
-  const ProfileLoadRequested();
+  const ProfileLoadRequested({required this.userId});
+
+  final String userId;
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 class ProfileLogoutRequested extends ProfileEvent {
@@ -93,7 +98,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ) async {
     emit(const ProfileLoading());
     try {
-      final user = await _profileRepository.getProfile();
+      final user = await _profileRepository.getProfile(event.userId);
       emit(ProfileLoaded(user: user));
     } on NetworkException catch (e) {
       emit(ProfileFailure(error: e.message, code: e.code));
