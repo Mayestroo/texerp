@@ -267,7 +267,6 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
 
   void _showEditOrAssignSheet(UserProfile user) {
     final nameController = TextEditingController(text: user.fullName);
-    String? selectedForemanId = user.foreman?.id;
     String? selectedDeptId = user.department?.id;
 
     showCupertinoModalPopup<void>(
@@ -279,10 +278,13 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
           value: this.context.read<WorkersBloc>(),
           child: BlocBuilder<WorkersBloc, WorkersState>(
             builder: (context, state) {
-            final hasAssistanceData = state.foremen.isNotEmpty && state.departments.isNotEmpty;
+            final deptsAvailable = state.departments.isNotEmpty;
+            final selectedDept = selectedDeptId != null
+                ? state.departments.where((d) => d.id == selectedDeptId).firstOrNull
+                : null;
 
             return Container(
-              height: MediaQuery.of(context).size.height * 0.7,
+              height: MediaQuery.of(context).size.height * 0.6,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: CupertinoColors.systemBackground.resolveFrom(context),
@@ -298,7 +300,6 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Row(
@@ -322,7 +323,6 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Full Name
                         Text(
                           'Ism-sharif (F.I.SH)',
                           style: TextStyle(
@@ -338,10 +338,9 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                           placeholder: 'F.I.SH',
                         ),
                         const SizedBox(height: 20),
-                        // Assignments Section if Role is WORKER
                         if (user.role == 'WORKER') ...[
                           Text(
-                            'Prorab va Bo\'lim biriktirish',
+                            'Bo\'lim biriktirish',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -352,56 +351,12 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                           const SizedBox(height: 12),
                           if (state.isAssistanceLoading)
                             const Center(child: CupertinoActivityIndicator())
-                          else if (!hasAssistanceData)
+                          else if (!deptsAvailable)
                             Text(
-                              'Prorablar yoki bo\'limlar topilmadi. Avval ularni qo\'shish lozim.',
+                              'Bo\'limlar topilmadi. Avval bo\'lim qo\'shish lozim.',
                               style: TextStyle(fontSize: 13, color: AppColors.error, inherit: false),
                             )
                           else ...[
-                            // Foreman Picker Selector
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Mas\'ul prorab:',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                                    inherit: false,
-                                  ),
-                                ),
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: Text(
-                                    selectedForemanId == null
-                                        ? 'Tanlang'
-                                        : state.foremen.firstWhere((f) => f.id == selectedForemanId, orElse: () => user.foreman != null ? UserProfile(id: selectedForemanId!, fullName: user.foreman!.fullName, phone: '', workerCode: '', role: 'FOREMAN', status: 'ACTIVE') : UserProfile(id: '', fullName: 'Noma\'lum', phone: '', workerCode: '', role: '', status: '')).fullName,
-                                  ),
-                                  onPressed: () {
-                                    showCupertinoModalPopup<void>(
-                                      context: context,
-                                      builder: (context) {
-                                        return Container(
-                                          height: 250,
-                                          color: CupertinoColors.systemBackground.resolveFrom(context),
-                                          child: CupertinoPicker(
-                                            itemExtent: 32,
-                                            onSelectedItemChanged: (index) {
-                                              setModalState(() {
-                                                selectedForemanId = state.foremen[index].id;
-                                              });
-                                            },
-                                            children: state.foremen.map((f) => Center(child: Text(f.fullName))).toList(),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            // Department Picker Selector
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -418,7 +373,7 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                                   child: Text(
                                     selectedDeptId == null
                                         ? 'Tanlang'
-                                        : state.departments.firstWhere((d) => d.id == selectedDeptId, orElse: () => user.department != null ? Department(id: selectedDeptId!, name: user.department!.name) : Department(id: '', name: 'Noma\'lum')).name,
+                                        : selectedDept?.name ?? 'Noma\'lum',
                                   ),
                                   onPressed: () {
                                     showCupertinoModalPopup<void>(
@@ -443,29 +398,32 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                                 ),
                               ],
                             ),
-                            if (user.foreman != null) ...[
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: Text(
-                                    'Prorabni bekor qilish',
-                                    style: TextStyle(color: AppColors.error, fontSize: 13),
+                            if (selectedDept != null) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(CupertinoIcons.person_fill, size: 14,
+                                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Prorab: ${selectedDept.foremanName ?? "Biriktirilmagan"}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                      inherit: false,
+                                    ),
                                   ),
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    this.context.read<WorkersBloc>().add(
-                                          WorkersUnassignForemanRequested(workerId: user.id),
-                                        );
-                                  },
-                                ),
+                                ],
                               ),
+                              if (selectedDept.foremanName == null)
+                                Text(
+                                  'Bu bo\'limga prorab biriktirilmagan. Avval bo\'limni tahrirlang.',
+                                  style: TextStyle(fontSize: 12, color: AppColors.error, inherit: false),
+                                ),
                             ],
                           ],
                         ],
                         const Spacer(),
-                        // Save changes button
                         CupertinoButton(
                           padding: EdgeInsets.zero,
                           onPressed: () {
@@ -474,23 +432,25 @@ class _WorkersManagementScreenState extends State<WorkersManagementScreen> {
                               AppToast.show(context, message: 'Ismni to\'ldiring', type: ToastType.error);
                               return;
                             }
+                            if (user.role == 'WORKER' && selectedDeptId == null) {
+                              AppToast.show(context, message: 'Bo\'limni tanlang', type: ToastType.error);
+                              return;
+                            }
 
                             Navigator.of(context).pop();
 
-                            // 1. Update Profile details
                             if (name != user.fullName) {
                               this.context.read<WorkersBloc>().add(
                                     WorkersUpdateRequested(id: user.id, fullName: name),
                                   );
                             }
 
-                            // 2. Assign/Update assignment if worker
-                            if (user.role == 'WORKER' && selectedForemanId != null && selectedDeptId != null) {
-                              if (selectedForemanId != user.foreman?.id || selectedDeptId != user.department?.id) {
+                            if (user.role == 'WORKER' && selectedDeptId != null) {
+                              if (selectedDeptId != user.department?.id) {
                                 this.context.read<WorkersBloc>().add(
                                       WorkersAssignForemanRequested(
                                         workerId: user.id,
-                                        foremanId: selectedForemanId!,
+                                        foremanId: '',
                                         departmentId: selectedDeptId!,
                                       ),
                                     );

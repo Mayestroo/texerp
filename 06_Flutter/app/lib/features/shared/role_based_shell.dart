@@ -20,6 +20,8 @@ import 'package:texerp/features/production/presentation/catalog_bloc.dart';
 import 'package:texerp/features/production/presentation/catalog_screen.dart';
 import 'package:texerp/features/profile/presentation/workers_bloc.dart';
 import 'package:texerp/features/profile/presentation/workers_management_screen.dart';
+import 'package:texerp/features/profile/presentation/departments_bloc.dart';
+import 'package:texerp/features/profile/presentation/departments_management_screen.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class _RoleTab {
@@ -94,6 +96,11 @@ class DirectorHomeScreen extends StatelessWidget {
             profileRepository: context.read<ProfileRepository>(),
           ),
         ),
+        BlocProvider(
+          create: (context) => DepartmentsBloc(
+            profileRepository: context.read<ProfileRepository>(),
+          ),
+        ),
       ],
       child: const _RoleBasedShell(role: 'DIRECTOR'),
     );
@@ -137,6 +144,7 @@ class _RoleBasedShellState extends State<_RoleBasedShell> {
         return [
           _RoleTab(label: l10n.home, icon: CupertinoIcons.house, activeIcon: CupertinoIcons.house_fill, title: l10n.home),
           _RoleTab(label: l10n.workers, icon: CupertinoIcons.person_3, activeIcon: CupertinoIcons.person_3_fill, title: l10n.workers),
+          _RoleTab(label: l10n.departments, icon: CupertinoIcons.square_list, activeIcon: CupertinoIcons.square_list_fill, title: l10n.departments),
           _RoleTab(label: l10n.catalog, icon: CupertinoIcons.rectangle_grid_2x2, activeIcon: CupertinoIcons.rectangle_grid_2x2_fill, title: l10n.catalog),
         ];
       case 'WORKER':
@@ -374,6 +382,8 @@ class _RoleBasedShellState extends State<_RoleBasedShell> {
       if (index == 1) {
         return const WorkersManagementScreen();
       } else if (index == 2) {
+        return const DepartmentsManagementScreen();
+      } else if (index == 3) {
         return const CatalogScreen();
       }
     }

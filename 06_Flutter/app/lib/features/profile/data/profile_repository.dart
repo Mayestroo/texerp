@@ -147,6 +147,7 @@ class ProfileRepository {
   }
 
   /// Assigns a foreman and department to a worker.
+  /// Foreman is inferred from the department's foreman_id on the backend.
   Future<void> assignForeman({
     required String workerId,
     required String foremanId,
@@ -156,10 +157,56 @@ class ProfileRepository {
       await _apiClient.dio.put<Map<String, dynamic>>(
         '/users/$workerId/foreman-assignment',
         data: {
-          'foreman_id': foremanId,
           'department_id': departmentId,
         },
       );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Creates a new department.
+  Future<Department> createDepartment({
+    required String name,
+    required String code,
+    required String foremanId,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/departments',
+        data: {
+          'name': name,
+          'code': code,
+          'foreman_id': foremanId,
+        },
+      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return Department.fromJson(data);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Updates a department.
+  Future<Department> updateDepartment({
+    required String id,
+    String? name,
+    String? code,
+    String? foremanId,
+    bool? isActive,
+  }) async {
+    try {
+      final response = await _apiClient.dio.patch<Map<String, dynamic>>(
+        '/departments/$id',
+        data: {
+          if (name != null) 'name': name,
+          if (code != null) 'code': code,
+          if (foremanId != null) 'foreman_id': foremanId,
+          if (isActive != null) 'is_active': isActive,
+        },
+      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return Department.fromJson(data);
     } on DioException catch (e) {
       throw _mapDioError(e);
     }

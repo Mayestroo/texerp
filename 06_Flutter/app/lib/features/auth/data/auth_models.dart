@@ -40,22 +40,35 @@ class LoginResponse extends Equatable {
 
 /// Lightweight department reference returned with a user profile.
 class Department extends Equatable {
-  const Department({required this.id, required this.name, this.code});
+  const Department({
+    required this.id,
+    required this.name,
+    this.code,
+    this.isActive,
+    this.foremanName,
+    this.workerCount,
+  });
 
   final String id;
   final String name;
   final String? code;
+  final bool? isActive;
+  final String? foremanName;
+  final int? workerCount;
 
   factory Department.fromJson(Map<String, dynamic> json) {
     return Department(
       id: json['id'] as String,
       name: json['name'] as String,
       code: json['code'] as String?,
+      isActive: json['is_active'] as bool?,
+      foremanName: (json['foreman'] as Map<String, dynamic>?)?['full_name'] as String?,
+      workerCount: json['worker_count'] as int?,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, code];
+  List<Object?> get props => [id, name, code, isActive, foremanName, workerCount];
 }
 
 /// Lightweight foreman reference returned with a worker profile.
