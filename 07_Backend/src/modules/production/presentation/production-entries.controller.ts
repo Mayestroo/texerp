@@ -61,4 +61,16 @@ export class ProductionEntriesController {
     );
     return { success: true, ...result };
   }
+
+  @Get('foreman/pending')
+  @Roles('FOREMAN')
+  async listPendingForForeman(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: OperationEntryView[] }> {
+    const data = await this.productionEntriesService.listPendingForForeman(
+      request.user.tenant_id,
+      request.user.sub,
+    );
+    return { success: true, data };
+  }
 }

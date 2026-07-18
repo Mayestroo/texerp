@@ -31,7 +31,14 @@ interface DuplicateEntryRow {
 
 export interface OperationEntryView {
   id: string;
+  worker_id?: string;
+  operation_id?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPICIOUS';
+  worker?: {
+    id: string;
+    full_name: string;
+    worker_code: string;
+  };
   operation: {
     id: string;
     name: string;
@@ -261,6 +268,55 @@ export class ProductionEntriesService {
 
       return { data: entries, total };
     });
+  }
+
+  async listPendingForForeman(
+    tenantId: string,
+    foremanId: string,
+  ): Promise<OperationEntryView[]> {
+    return this.tenantDatabase.withTenant(tenantId, (manager) =>
+      manager.query<OperationEntryView[]>(
+        `SELECT
+           pe.id,
+           pe.worker_id,
+           pe.operation_id,
+           pe.quantity AS quantity_submitted,
+           pe.record_date::text AS record_date,
+           pe.status,
+           pe.operation_name_snapshot,
+           pe.operation_code_snapshot,
+           pe.unit_price_snapshot,
+           pe.currency_snapshot,
+           pe.worker_note,
+            pe.created_at AS submitted_at,
+           json_build_object(
+             'id', u.id,
+             'full_name', u.full_name,
+             'worker_code', u.worker_code
+           ) AS worker,
+           json_build_object(
+             'id', o.id,
+             'name', o.name,
+             'unit', o.unit
+           ) AS operation
+         FROM production_entries pe
+         JOIN foreman_assignments fa
+           ON fa.tenant_id = pe.tenant_id
+          AND fa.worker_id = pe.worker_id
+          AND fa.foreman_id = $2
+          AND fa.unassigned_at IS NULL
+         JOIN users u
+           ON u.tenant_id = pe.tenant_id
+          AND u.id = pe.worker_id
+         JOIN operations o
+           ON o.tenant_id = pe.tenant_id
+          AND o.id = pe.operation_id
+         WHERE pe.tenant_id = $1
+           AND pe.status = 'PENDING'
+         ORDER BY pe.created_at DESC`,
+        [tenantId, foremanId],
+      ),
+    );
   }
 
   private async validateWorker(
