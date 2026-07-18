@@ -64,10 +64,8 @@ class _LockScreenState extends State<LockScreen>
     try {
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Ilovaga kirish uchun tasdiqlang',
-        options: const AuthenticationOptions(
-          stickyAuth: true,
-          biometricOnly: true,
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: true,
       );
       if (authenticated && mounted) {
         context.read<AuthBloc>().add(const AuthUnlockRequested());

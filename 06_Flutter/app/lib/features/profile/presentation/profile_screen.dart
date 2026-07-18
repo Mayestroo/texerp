@@ -443,10 +443,8 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
       try {
         final authenticated = await _localAuth.authenticate(
           localizedReason: 'Biometrik kirishni faollashtirish uchun tasdiqlang',
-          options: const AuthenticationOptions(
-            stickyAuth: true,
-            biometricOnly: true,
-          ),
+          persistAcrossBackgrounding: true,
+          biometricOnly: true,
         );
         if (!authenticated) return;
       } catch (e) {
