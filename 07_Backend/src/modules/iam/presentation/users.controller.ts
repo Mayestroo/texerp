@@ -40,7 +40,7 @@ export class UsersController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('DIRECTOR', 'ACCOUNTANT', 'FOREMAN')
+  @Roles('DIRECTOR', 'ACCOUNTANT', 'FOREMAN', 'WORKER')
   async getById(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() request: AuthenticatedRequest,

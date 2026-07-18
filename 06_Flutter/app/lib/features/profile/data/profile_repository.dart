@@ -21,6 +21,161 @@ class ProfileRepository {
     }
   }
 
+  /// Fetches workers assigned to the foreman.
+  Future<List<UserProfile>> fetchMyWorkers() async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>('/users/me/workers');
+      final dataList = response.data!['data'] as List<dynamic>;
+      return dataList
+          .map((json) => UserProfile.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Fetches all users (with optional role, status, and search filters).
+  Future<(List<UserProfile> data, int total)> fetchUsers({
+    String? role,
+    String status = 'ACTIVE',
+    String? search,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/users',
+        queryParameters: {
+          if (role != null) 'role': role,
+          'status': status,
+          if (search != null && search.isNotEmpty) 'search': search,
+          'page': page,
+          'limit': limit,
+        },
+      );
+      final dataList = response.data!['data'] as List<dynamic>;
+      final total = response.data!['total'] as int? ?? dataList.length;
+      final users = dataList
+          .map((json) => UserProfile.fromJson(json as Map<String, dynamic>))
+          .toList();
+      return (users, total);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Creates a new user.
+  Future<UserProfile> createUser({
+    required String fullName,
+    required String phone,
+    required String workerCode,
+    required String role,
+    required String initialPin,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/users',
+        data: {
+          'full_name': fullName,
+          'phone': phone,
+          'worker_code': workerCode,
+          'role': role,
+          'initial_pin': initialPin,
+        },
+      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return UserProfile.fromJson(data);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Updates an existing user.
+  Future<UserProfile> updateUser({
+    required String id,
+    required String fullName,
+  }) async {
+    try {
+      final response = await _apiClient.dio.patch<Map<String, dynamic>>(
+        '/users/$id',
+        data: {
+          'full_name': fullName,
+        },
+      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return UserProfile.fromJson(data);
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Deactivates a user.
+  Future<void> deactivateUser(String id) async {
+    try {
+      await _apiClient.dio.post<Map<String, dynamic>>(
+        '/users/$id/deactivate',
+        data: {},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Reactivates a user.
+  Future<void> reactivateUser(String id) async {
+    try {
+      await _apiClient.dio.post<Map<String, dynamic>>(
+        '/users/$id/reactivate',
+        data: {},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Fetches departments.
+  Future<List<Department>> fetchDepartments() async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>('/departments');
+      final dataList = response.data!['data'] as List<dynamic>;
+      return dataList
+          .map((json) => Department.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Assigns a foreman and department to a worker.
+  Future<void> assignForeman({
+    required String workerId,
+    required String foremanId,
+    required String departmentId,
+  }) async {
+    try {
+      await _apiClient.dio.put<Map<String, dynamic>>(
+        '/users/$workerId/foreman-assignment',
+        data: {
+          'foreman_id': foremanId,
+          'department_id': departmentId,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Unassigns foreman from a worker.
+  Future<void> unassignForeman({required String workerId}) async {
+    try {
+      await _apiClient.dio.delete<Map<String, dynamic>>(
+        '/users/$workerId/foreman-assignment',
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   NetworkException _mapDioError(DioException e) {
     final response = e.response;
     if (response != null) {

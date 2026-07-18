@@ -6,8 +6,12 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { BulkApprovePartialFailureError } from '../application/errors/bulk-approve-partial-failure.error';
 import { DateOutOfWindowError } from '../application/errors/date-out-of-window.error';
 import { DuplicateEntryError } from '../application/errors/duplicate-entry.error';
+import { EntryNotFoundError } from '../application/errors/entry-not-found.error';
+import { EntryNotPendingError } from '../application/errors/entry-not-pending.error';
+import { ForemanNotAssignedError } from '../application/errors/foreman-not-assigned.error';
 import { OperationInactiveError } from '../application/errors/operation-inactive.error';
 import { OperationNotFoundError } from '../application/errors/operation-not-found.error';
 import { WorkerNotActiveError } from '../application/errors/worker-not-active.error';
@@ -17,7 +21,11 @@ type ProductionApplicationError =
   | OperationInactiveError
   | DuplicateEntryError
   | WorkerNotActiveError
-  | DateOutOfWindowError;
+  | DateOutOfWindowError
+  | EntryNotFoundError
+  | EntryNotPendingError
+  | ForemanNotAssignedError
+  | BulkApprovePartialFailureError;
 
 @Catch(
   OperationNotFoundError,
@@ -25,6 +33,10 @@ type ProductionApplicationError =
   DuplicateEntryError,
   WorkerNotActiveError,
   DateOutOfWindowError,
+  EntryNotFoundError,
+  EntryNotPendingError,
+  ForemanNotAssignedError,
+  BulkApprovePartialFailureError,
 )
 @Injectable()
 export class ProductionExceptionFilter
@@ -67,6 +79,43 @@ export class ProductionExceptionFilter
         'WORKER_NOT_ACTIVE',
         'Ishchi faol emas',
       );
+      return;
+    }
+    if (exception instanceof EntryNotFoundError) {
+      this.send(
+        response,
+        HttpStatus.NOT_FOUND,
+        'ENTRY_NOT_FOUND',
+        'Yozuv topilmadi',
+      );
+      return;
+    }
+    if (exception instanceof EntryNotPendingError) {
+      this.send(
+        response,
+        HttpStatus.BAD_REQUEST,
+        'ENTRY_NOT_PENDING',
+        'Yozuv kutilayotgan holatda emas',
+      );
+      return;
+    }
+    if (exception instanceof ForemanNotAssignedError) {
+      this.send(
+        response,
+        HttpStatus.FORBIDDEN,
+        'FOREMAN_NOT_ASSIGNED',
+        'Brigadir ushbu ishchiga biriktirilmagan',
+      );
+      return;
+    }
+    if (exception instanceof BulkApprovePartialFailureError) {
+      response.status(HttpStatus.MULTI_STATUS).json({
+        success: true,
+        data: {
+          approved_count: exception.successful_ids.length,
+          skipped_entries: exception.failed_ids,
+        },
+      });
       return;
     }
     this.send(

@@ -13,6 +13,8 @@ import { TenantDatabase } from '../../../infrastructure/database/tenant-database
 import { uuidv7 } from '../../../shared/utils/uuid';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { ChangePinDto } from './dto/change-pin.dto';
+import { VerifyPinDto } from './dto/verify-pin.dto';
 import { AccessTokenClaims } from './access-token-claims';
 import { RedisService } from '../../../infrastructure/redis/redis.service';
 
@@ -566,5 +568,91 @@ export class AuthService {
       },
       HttpStatus.TOO_MANY_REQUESTS,
     );
+  }
+
+  async verifyPin(
+    userId: string,
+    tenantId: string,
+    dto: VerifyPinDto,
+  ): Promise<void> {
+    const user = await this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const rows = await manager.query<LoginUserRow[]>(
+        `SELECT * FROM users WHERE id = $1 AND tenant_id = $2`,
+        [userId, tenantId]
+      );
+      return rows[0];
+    });
+
+    if (!user) {
+      throw new UnauthorizedException({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'Foydalanuvchi topilmadi' },
+      });
+    }
+
+    const pinMatches = await bcrypt.compare(dto.pin, user.pin_hash);
+    if (!pinMatches) {
+      throw new ForbiddenException({
+        success: false,
+        error: { code: 'INVALID_CURRENT_PIN', message: "Joriy PIN noto'g'ri" },
+      });
+    }
+  }
+
+  async changePin(
+    userId: string,
+    tenantId: string,
+    dto: ChangePinDto,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    const user = await this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const rows = await manager.query<LoginUserRow[]>(
+        `SELECT * FROM users WHERE id = $1 AND tenant_id = $2`,
+        [userId, tenantId]
+      );
+      return rows[0];
+    });
+
+    if (!user) {
+      throw new UnauthorizedException({
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'Foydalanuvchi topilmadi' },
+      });
+    }
+
+    const pinMatches = await bcrypt.compare(dto.current_pin, user.pin_hash);
+    if (!pinMatches) {
+      throw new ForbiddenException({
+        success: false,
+        error: { code: 'INVALID_CURRENT_PIN', message: "Joriy PIN noto'g'ri" },
+      });
+    }
+
+    const newPinHash = await bcrypt.hash(dto.new_pin, 12);
+
+    await this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      await manager.query(
+        `INSERT INTO audit_events
+          (id, tenant_id, aggregate_type, aggregate_id, action, actor_id, actor_role,
+           after_state, ip_address, user_agent)
+         VALUES ($1, $2, 'USER', $3, 'PIN_CHANGED', $3, $4,
+           '{}'::jsonb, $5, $6)`,
+        [
+          uuidv7(),
+          tenantId,
+          userId,
+          user.role,
+          metadata.ipAddress ?? null,
+          metadata.userAgent ?? null,
+        ],
+      );
+
+      await manager.query(
+        `UPDATE users
+         SET pin_hash = $1, updated_at = now()
+         WHERE id = $2 AND tenant_id = $3`,
+        [newPinHash, userId, tenantId]
+      );
+    });
   }
 }

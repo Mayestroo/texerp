@@ -74,6 +74,30 @@ class AuthRepository {
     await _secureStorage.clearTokens();
   }
 
+  /// Changes the user's PIN
+  Future<void> changePin(String currentPin, String newPin) async {
+    try {
+      await _apiClient.dio.post<Map<String, dynamic>>(
+        '/auth/change-pin',
+        data: {'current_pin': currentPin, 'new_pin': newPin},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
+  /// Verifies if the PIN is correct
+  Future<void> verifyPin(String pin) async {
+    try {
+      await _apiClient.dio.post<Map<String, dynamic>>(
+        '/auth/verify-pin',
+        data: {'pin': pin},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   /// Fetches the currently authenticated user profile.
   Future<UserProfile> getProfile(String userId) async {
     try {

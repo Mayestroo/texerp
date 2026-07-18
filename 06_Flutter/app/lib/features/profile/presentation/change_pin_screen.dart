@@ -1,11 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:texerp/core/error/network_exception.dart';
+import 'package:texerp/features/auth/data/auth_repository.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
+import 'package:texerp/core/theme/app_theme.dart';
+import 'package:texerp/core/widgets/num_pad.dart';
+import 'package:texerp/core/widgets/pin_dots.dart';
+import 'package:texerp/core/widgets/app_toast.dart';
 class ChangePinScreen extends StatefulWidget {
   const ChangePinScreen({super.key});
 
@@ -15,13 +19,14 @@ class ChangePinScreen extends StatefulWidget {
 
 class _ChangePinScreenState extends State<ChangePinScreen>
     with SingleTickerProviderStateMixin {
-  final _pinController = TextEditingController();
-  final _focusNode = FocusNode();
-
-  int _step = 0; // 0 = current, 1 = new, 2 = confirm
+  
+  int _step = 0;
+  String _pin = '';
   String _newPin = '';
   String _confirmPin = '';
+  String _typedCurrentPin = '';
   String _errorMessage = '';
+  bool _isLoading = false;
 
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
@@ -36,21 +41,12 @@ class _ChangePinScreenState extends State<ChangePinScreen>
     _shakeAnimation = Tween<double>(begin: 0, end: 10)
         .chain(CurveTween(curve: Curves.elasticIn))
         .animate(_shakeController);
-    _requestFocus();
   }
 
   @override
   void dispose() {
-    _pinController.dispose();
-    _focusNode.dispose();
     _shakeController.dispose();
     super.dispose();
-  }
-
-  void _requestFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-    });
   }
 
   String get _currentPin => context.read<AuthBloc>().state.currentPin ?? '';
@@ -68,12 +64,34 @@ class _ChangePinScreenState extends State<ChangePinScreen>
     }
   }
 
-  void _onPinChanged(String value) {
-    setState(() {
-      _errorMessage = '';
-    });
-    if (value.length != 4) return;
+  void _onDigitTapped(String digit) {
+    if (_isLoading) return;
+    if (_pin.length < 4) {
+      setState(() {
+        _errorMessage = '';
+        _pin += digit;
+      });
 
+      if (_pin.length == 4) {
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (!mounted) return;
+          _onPinComplete(_pin);
+        });
+      }
+    }
+  }
+
+  void _onBackspaceTapped() {
+    if (_isLoading) return;
+    if (_pin.isNotEmpty) {
+      setState(() {
+        _errorMessage = '';
+        _pin = _pin.substring(0, _pin.length - 1);
+      });
+    }
+  }
+
+  void _onPinComplete(String value) {
     switch (_step) {
       case 0:
         _validateCurrentPin(value);
@@ -87,19 +105,47 @@ class _ChangePinScreenState extends State<ChangePinScreen>
     }
   }
 
-  void _validateCurrentPin(String pin) {
-    // For the MVP stub the current PIN is verified against the in-memory PIN
-    // captured at login. Once the backend exposes POST /users/me/pin this will
-    // be replaced by a server check.
-    if (_currentPin.isNotEmpty && pin != _currentPin) {
-      _triggerError(AppLocalizations.of(context)!.currentPinIncorrect);
+  Future<void> _validateCurrentPin(String pin) async {
+    if (_currentPin.isNotEmpty) {
+      if (pin != _currentPin) {
+        _triggerError(AppLocalizations.of(context)!.currentPinIncorrect);
+        return;
+      }
+      setState(() {
+        _typedCurrentPin = pin;
+        _pin = '';
+        _step = 1;
+      });
       return;
     }
-    _pinController.clear();
-    setState(() {
-      _step = 1;
-    });
-    _requestFocus();
+
+    setState(() => _isLoading = true);
+    try {
+      await context.read<AuthRepository>().verifyPin(pin).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw const NetworkException(code: 'TIMEOUT', message: 'Ulanish vaqti tugadi'),
+      );
+      if (!mounted) return;
+      setState(() {
+        _typedCurrentPin = pin;
+        _pin = '';
+        _step = 1;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      String errorMessage = 'Joriy PIN noto\'g\'ri';
+      if (e is NetworkException) {
+        errorMessage = e.message;
+      }
+      try {
+        AppToast.show(context, message: errorMessage, type: ToastType.error);
+      } catch (_) {}
+      _triggerError(errorMessage);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _validateNewPin(String pin) {
@@ -109,10 +155,9 @@ class _ChangePinScreenState extends State<ChangePinScreen>
     }
     setState(() {
       _newPin = pin;
+      _pin = '';
       _step = 2;
     });
-    _pinController.clear();
-    _requestFocus();
   }
 
   void _validateConfirmPin(String pin) {
@@ -134,121 +179,137 @@ class _ChangePinScreenState extends State<ChangePinScreen>
     _shakeController.forward(from: 0);
     setState(() {
       _errorMessage = message;
-      _pinController.clear();
+      _pin = '';
     });
-    _focusNode.requestFocus();
   }
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
-    // Backend endpoint POST /users/me/pin is not wired up yet.
-    // ignore: avoid_print
-    debugPrint('PIN change stub: $_newPin');
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(l10n.pinChanged)));
-    if (mounted) {
-      context.pop();
+    setState(() => _isLoading = true);
+    
+    try {
+      // Added a 15 second timeout to prevent getting stuck forever
+      await context.read<AuthRepository>().changePin(_typedCurrentPin, _newPin).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw const NetworkException(code: 'TIMEOUT', message: 'Ulanish vaqti tugadi'),
+      );
+      
+      if (!mounted) return;
+      context.read<AuthBloc>().add(AuthPinUpdated(newPin: _newPin));
+      AppToast.show(context, message: l10n.pinChanged, type: ToastType.success);
+      
+      // Give user a brief moment to see all 4 PIN dots filled before disappearing
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (mounted) {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/profile');
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      String errorMessage = 'Xatolik yuz berdi';
+      if (e is NetworkException) {
+        errorMessage = e.message;
+      }
+      try {
+        AppToast.show(context, message: errorMessage, type: ToastType.error);
+      } catch (_) {
+        // Fallback if AppToast fails
+      }
+      _triggerError(errorMessage);
+      setState(() {
+        _step = 0;
+        _pin = '';
+        _newPin = '';
+        _confirmPin = '';
+        _typedCurrentPin = '';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
+
+// Removed _showToast
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.changePin),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        transitionBetweenRoutes: false,
+        middle: Text(l10n.changePin, style: const TextStyle(color: AppColors.labelPrimary)),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.back, color: AppColors.labelPrimary),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/profile');
+            }
+          },
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              Text(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
                 _stepLabel(l10n),
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 24),
-              AnimatedBuilder(
-                animation: _shakeAnimation,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(_shakeAnimation.value, 0),
-                    child: child,
-                  );
-                },
-                child: _PinDots(
-                  pin: _pinController.text,
-                  hasError: _errorMessage.isNotEmpty,
+                style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.labelPrimary,
                 ),
               ),
-              if (_errorMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    _errorMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 24),
+            AnimatedBuilder(
+              animation: _shakeAnimation,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(_shakeAnimation.value, 0),
+                  child: child,
+                );
+              },
+              child: _isLoading 
+                  ? const CupertinoActivityIndicator(radius: 16)
+                  : PinDots(
+                      pin: _pin,
+                      hasError: _errorMessage.isNotEmpty,
+                    ),
+            ),
+            if (_errorMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+                child: Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                    color: CupertinoColors.destructiveRed,
                   ),
                 ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 0,
-                child: TextField(
-                  controller: _pinController,
-                  focusNode: _focusNode,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    border: InputBorder.none,
-                  ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: _onPinChanged,
-                ),
               ),
-            ],
-          ),
+            const Spacer(),
+            NumPad(
+              onDigit: _onDigitTapped,
+              onBackspace: _onBackspaceTapped,
+            ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PinDots extends StatelessWidget {
-  const _PinDots({required this.pin, required this.hasError});
-
-  final String pin;
-  final bool hasError;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(4, (index) {
-        final filled = index < pin.length;
-        return Container(
-          width: 20,
-          height: 20,
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: filled
-                ? (hasError ? colorScheme.error : colorScheme.primary)
-                : colorScheme.outline,
-          ),
-        );
-      }),
-    );
-  }
-}

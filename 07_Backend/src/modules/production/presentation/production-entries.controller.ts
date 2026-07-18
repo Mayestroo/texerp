@@ -3,6 +3,9 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -15,8 +18,12 @@ import {
 } from '../../iam/presentation/jwt-auth.guard';
 import { Roles } from '../../iam/presentation/roles.decorator';
 import { RolesGuard } from '../../iam/presentation/roles.guard';
+import { ApproveEntryDto } from '../application/dto/approve-entry.dto';
+import { BulkApproveDto } from '../application/dto/bulk-approve.dto';
+import { CorrectApproveEntryDto } from '../application/dto/correct-approve-entry.dto';
 import { CreateOperationEntryDto } from '../application/dto/create-operation-entry.dto';
 import { ListMyEntriesQueryDto } from '../application/dto/list-my-entries-query.dto';
+import { RejectEntryDto } from '../application/dto/reject-entry.dto';
 import {
   OperationEntryView,
   ProductionEntriesService,
@@ -72,5 +79,74 @@ export class ProductionEntriesController {
       request.user.sub,
     );
     return { success: true, data };
+  }
+
+  @Post(':id/approve')
+  @Roles('FOREMAN')
+  async approveEntry(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ApproveEntryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: OperationEntryView }> {
+    const data = await this.productionEntriesService.approveEntry(
+      request.user.tenant_id,
+      request.user.sub,
+      id,
+      dto,
+      request.user,
+      { ipAddress: request.ip, userAgent: request.get('user-agent') },
+    );
+    return { success: true, data };
+  }
+
+  @Post(':id/reject')
+  @Roles('FOREMAN')
+  async rejectEntry(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: RejectEntryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: OperationEntryView }> {
+    const data = await this.productionEntriesService.rejectEntry(
+      request.user.tenant_id,
+      request.user.sub,
+      id,
+      dto,
+      request.user,
+      { ipAddress: request.ip, userAgent: request.get('user-agent') },
+    );
+    return { success: true, data };
+  }
+
+  @Patch(':id/correct-approve')
+  @Roles('FOREMAN')
+  async correctAndApproveEntry(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: CorrectApproveEntryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: OperationEntryView }> {
+    const data = await this.productionEntriesService.correctAndApproveEntry(
+      request.user.tenant_id,
+      request.user.sub,
+      id,
+      dto,
+      request.user,
+      { ipAddress: request.ip, userAgent: request.get('user-agent') },
+    );
+    return { success: true, data };
+  }
+
+  @Post('bulk-approve')
+  @Roles('FOREMAN')
+  async bulkApproveEntries(
+    @Body() dto: BulkApproveDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ success: true; data: { approved_count: number } }> {
+    return this.productionEntriesService.bulkApproveEntries(
+      request.user.tenant_id,
+      request.user.sub,
+      dto,
+      request.user,
+      { ipAddress: request.ip, userAgent: request.get('user-agent') },
+    );
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,68 +8,138 @@ import 'package:go_router/go_router.dart';
 import 'package:texerp/features/auth/data/auth_repository.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/auth/presentation/login_screen.dart';
+import 'package:texerp/features/auth/presentation/splash_screen.dart';
 import 'package:texerp/features/profile/data/profile_repository.dart';
 import 'package:texerp/features/profile/presentation/change_pin_screen.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:texerp/features/profile/presentation/profile_screen.dart';
 import 'package:texerp/features/shared/role_based_shell.dart';
+import 'package:texerp/features/auth/presentation/lock_screen.dart';
 
-/// Application router with role-based redirects.
+class _FadePage extends CustomTransitionPage<void> {
+  _FadePage({required super.child, super.key})
+      : super(
+          transitionDuration: const Duration(milliseconds: 250),
+          reverseTransitionDuration: const Duration(milliseconds: 200),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            );
+          },
+        );
+}
+
 class AppRouter {
   AppRouter({required AuthBloc authBloc}) : _authBloc = authBloc;
 
   final AuthBloc _authBloc;
 
   GoRouter get router => GoRouter(
+        initialLocation: '/splash',
         refreshListenable: _AuthRefreshStream(_authBloc.stream),
+        debugLogDiagnostics: false,
         redirect: (context, state) {
           final authState = _authBloc.state;
           final isAuthenticated = authState is AuthAuthenticated;
+          final isUnauthenticated = authState is AuthUnauthenticated;
+          
           final isLoggingIn = state.matchedLocation == '/login';
+          final isSplash = state.matchedLocation == '/splash';
+          final isLock = state.matchedLocation == '/lock';
 
-          if (!isAuthenticated && !isLoggingIn) {
+          if (authState is AuthInitial || authState is AuthLoading) {
+            return isSplash ? null : '/splash';
+          }
+
+          if (isUnauthenticated && !isLoggingIn) {
             return '/login';
           }
-          if (isAuthenticated && isLoggingIn) {
-            return _homeForRole(authState.user.role);
+          
+          if (isAuthenticated) {
+            if (authState.isLocked) {
+              return '/lock';
+            }
+            if (isLoggingIn || isSplash || isLock) {
+              return _homeForRole(authState.user.role);
+            }
           }
+          
           return null;
         },
         routes: [
           GoRoute(
+            path: '/splash',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const SplashScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/login',
-            builder: (context, state) => const LoginScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const LoginScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/lock',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const LockScreen(),
+            ),
           ),
           GoRoute(
             path: '/worker/home',
-            builder: (context, state) => const WorkerHomeScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const WorkerHomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/foreman-home',
-            builder: (context, state) => const ForemanHomeScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const ForemanHomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/accountant-home',
-            builder: (context, state) => const AccountantHomeScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const AccountantHomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/director-home',
-            builder: (context, state) => const DirectorHomeScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const DirectorHomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => BlocProvider(
-              create: (_) => ProfileBloc(
-                profileRepository: context.read<ProfileRepository>(),
-                authRepository: context.read<AuthRepository>(),
-                onLogout: () => _authBloc.add(const AuthLogoutRequested()),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => ProfileBloc(
+                  profileRepository: context.read<ProfileRepository>(),
+                  authRepository: context.read<AuthRepository>(),
+                  onLogout: () => _authBloc.add(const AuthLogoutRequested()),
+                ),
+                child: const ProfileScreen(),
               ),
-              child: const ProfileScreen(),
             ),
           ),
           GoRoute(
             path: '/profile/change-pin',
-            builder: (context, state) => const ChangePinScreen(),
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const ChangePinScreen(),
+            ),
           ),
         ],
       );
@@ -90,7 +160,6 @@ class AppRouter {
   }
 }
 
-/// Listenable wrapper that notifies GoRouter when the auth stream emits.
 class _AuthRefreshStream extends ChangeNotifier {
   _AuthRefreshStream(Stream<AuthState> stream) {
     _subscription = stream.listen((_) => notifyListeners());

@@ -3,10 +3,18 @@ import { QueryFailedError, type EntityManager } from 'typeorm';
 import { TenantDatabase } from '../../../infrastructure/database/tenant-database';
 import { uuidv7 } from '../../../shared/utils/uuid';
 import { AccessTokenClaims } from '../../iam/application/access-token-claims';
+import { ApproveEntryDto } from './dto/approve-entry.dto';
+import { BulkApproveDto } from './dto/bulk-approve.dto';
+import { CorrectApproveEntryDto } from './dto/correct-approve-entry.dto';
 import { CreateOperationEntryDto } from './dto/create-operation-entry.dto';
 import { ListMyEntriesQueryDto } from './dto/list-my-entries-query.dto';
+import { RejectEntryDto } from './dto/reject-entry.dto';
+import { BulkApprovePartialFailureError } from './errors/bulk-approve-partial-failure.error';
 import { DateOutOfWindowError } from './errors/date-out-of-window.error';
 import { DuplicateEntryError } from './errors/duplicate-entry.error';
+import { EntryNotFoundError } from './errors/entry-not-found.error';
+import { EntryNotPendingError } from './errors/entry-not-pending.error';
+import { ForemanNotAssignedError } from './errors/foreman-not-assigned.error';
 import { OperationInactiveError } from './errors/operation-inactive.error';
 import { OperationNotFoundError } from './errors/operation-not-found.error';
 import { WorkerNotActiveError } from './errors/worker-not-active.error';
@@ -47,12 +55,20 @@ export interface OperationEntryView {
   operation_name_snapshot: string;
   operation_code_snapshot: string | null;
   quantity_submitted: number;
+  quantity_approved?: number | null;
   unit_price_snapshot: number;
   currency_snapshot: 'UZS';
   record_date: string;
   worker_note: string | null;
   submitted_at: Date;
   foreman: { id: string; full_name: string } | null;
+  approved_at?: Date | null;
+  rejected_at?: Date | null;
+  approved_by?: string | null;
+  rejected_by?: string | null;
+  rejection_reason?: string | null;
+  foreman_note?: string | null;
+  correction_comment?: string | null;
 }
 
 @Injectable()
@@ -317,6 +333,328 @@ export class ProductionEntriesService {
         [tenantId, foremanId],
       ),
     );
+  }
+
+  async approveEntry(
+    tenantId: string,
+    foremanId: string,
+    entryId: string,
+    _dto: ApproveEntryDto,
+    actor: AccessTokenClaims,
+    metadata: RequestMetadata,
+  ): Promise<OperationEntryView> {
+    return this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const entry = await this.lockPendingEntryOrFail(manager, tenantId, entryId);
+      await this.assertForemanOwnsWorker(
+        manager,
+        tenantId,
+        foremanId,
+        entry.worker_id,
+      );
+
+      await this.insertEntryAudit(
+        manager,
+        tenantId,
+        entryId,
+        'ENTRY_APPROVED',
+        actor,
+        { status: 'PENDING' },
+        { status: 'APPROVED' },
+        metadata,
+      );
+
+      await manager.query(
+        `UPDATE production_entries
+         SET status = 'APPROVED',
+             approved_at = now(),
+             approved_by = $3,
+             updated_at = now()
+         WHERE tenant_id = $1 AND id = $2`,
+        [tenantId, entryId, foremanId],
+      );
+
+      return this.requireEntryView(manager, tenantId, entryId);
+    });
+  }
+
+  async rejectEntry(
+    tenantId: string,
+    foremanId: string,
+    entryId: string,
+    dto: RejectEntryDto,
+    actor: AccessTokenClaims,
+    metadata: RequestMetadata,
+  ): Promise<OperationEntryView> {
+    return this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const entry = await this.lockPendingEntryOrFail(manager, tenantId, entryId);
+      await this.assertForemanOwnsWorker(
+        manager,
+        tenantId,
+        foremanId,
+        entry.worker_id,
+      );
+
+      await this.insertEntryAudit(
+        manager,
+        tenantId,
+        entryId,
+        'ENTRY_REJECTED',
+        actor,
+        { status: 'PENDING' },
+        { status: 'REJECTED', reason: dto.reason, foreman_note: dto.foreman_note ?? null },
+        metadata,
+      );
+
+      await manager.query(
+        `UPDATE production_entries
+         SET status = 'REJECTED',
+             rejection_reason = $3,
+             foreman_note = $4,
+             rejected_at = now(),
+             rejected_by = $5,
+             updated_at = now()
+         WHERE tenant_id = $1 AND id = $2`,
+        [tenantId, entryId, dto.reason, dto.foreman_note ?? null, foremanId],
+      );
+
+      return this.requireEntryView(manager, tenantId, entryId);
+    });
+  }
+
+  async correctAndApproveEntry(
+    tenantId: string,
+    foremanId: string,
+    entryId: string,
+    dto: CorrectApproveEntryDto,
+    actor: AccessTokenClaims,
+    metadata: RequestMetadata,
+  ): Promise<OperationEntryView> {
+    return this.tenantDatabase.withTenant(tenantId, async (manager) => {
+      const entry = await this.lockPendingEntryOrFail(manager, tenantId, entryId);
+      await this.assertForemanOwnsWorker(
+        manager,
+        tenantId,
+        foremanId,
+        entry.worker_id,
+      );
+
+      await this.insertEntryAudit(
+        manager,
+        tenantId,
+        entryId,
+        'ENTRY_CORRECTED',
+        actor,
+        { quantity: entry.quantity },
+        { quantity: dto.corrected_quantity, correction_comment: dto.correction_comment ?? null },
+        metadata,
+      );
+
+      await manager.query(
+        `UPDATE production_entries
+         SET quantity = $3,
+             status = 'APPROVED',
+             correction_comment = $4,
+             approved_at = now(),
+             approved_by = $5,
+             updated_at = now()
+         WHERE tenant_id = $1 AND id = $2`,
+        [
+          tenantId,
+          entryId,
+          dto.corrected_quantity,
+          dto.correction_comment ?? null,
+          foremanId,
+        ],
+      );
+
+      return this.requireEntryView(manager, tenantId, entryId);
+    });
+  }
+
+  async bulkApproveEntries(
+    tenantId: string,
+    foremanId: string,
+    dto: BulkApproveDto,
+    actor: AccessTokenClaims,
+    metadata: RequestMetadata,
+  ): Promise<{ success: true; data: { approved_count: number } }> {
+    const successfulIds: string[] = [];
+    const failedIds: Array<{ entry_id: string; reason: string }> = [];
+
+    for (const entryId of dto.entry_ids) {
+      try {
+        await this.approveEntry(
+          tenantId,
+          foremanId,
+          entryId,
+          {},
+          actor,
+          metadata,
+        );
+        successfulIds.push(entryId);
+      } catch (error) {
+        if (error instanceof EntryNotPendingError) {
+          failedIds.push({ entry_id: entryId, reason: 'ENTRY_NOT_PENDING' });
+        } else if (error instanceof ForemanNotAssignedError) {
+          failedIds.push({ entry_id: entryId, reason: 'FOREMAN_NOT_ASSIGNED' });
+        } else if (error instanceof EntryNotFoundError) {
+          failedIds.push({ entry_id: entryId, reason: 'ENTRY_NOT_FOUND' });
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (failedIds.length > 0) {
+      throw new BulkApprovePartialFailureError(successfulIds, failedIds);
+    }
+
+    return { success: true, data: { approved_count: successfulIds.length } };
+  }
+
+  private async lockPendingEntryOrFail(
+    manager: EntityManager,
+    tenantId: string,
+    entryId: string,
+  ): Promise<{ id: string; worker_id: string; status: string; quantity: number }> {
+    const rows = await manager.query<
+      { id: string; worker_id: string; status: string; quantity: number }[]
+    >(
+      `SELECT id, worker_id, status, quantity
+       FROM production_entries
+       WHERE tenant_id = $1 AND id = $2 AND status = 'PENDING'
+       FOR UPDATE`,
+      [tenantId, entryId],
+    );
+    if (rows[0]) {
+      return rows[0];
+    }
+
+    const existing = await manager.query<
+      { id: string; status: string }[]
+    >(
+      `SELECT id, status
+       FROM production_entries
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, entryId],
+    );
+    if (existing[0]) {
+      throw new EntryNotPendingError();
+    }
+    throw new EntryNotFoundError();
+  }
+
+  private async assertForemanOwnsWorker(
+    manager: EntityManager,
+    tenantId: string,
+    foremanId: string,
+    workerId: string,
+  ): Promise<void> {
+    const rows = await manager.query<{ id: string }[]>(
+      `SELECT id
+       FROM foreman_assignments
+       WHERE tenant_id = $1
+         AND foreman_id = $2
+         AND worker_id = $3
+         AND unassigned_at IS NULL
+       LIMIT 1`,
+      [tenantId, foremanId, workerId],
+    );
+    if (!rows[0]) {
+      throw new ForemanNotAssignedError();
+    }
+  }
+
+  private async insertEntryAudit(
+    manager: EntityManager,
+    tenantId: string,
+    entryId: string,
+    action: 'ENTRY_APPROVED' | 'ENTRY_REJECTED' | 'ENTRY_CORRECTED',
+    actor: AccessTokenClaims,
+    beforeState: Record<string, unknown>,
+    afterState: Record<string, unknown>,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    await manager.query(
+      `INSERT INTO audit_events
+        (id, tenant_id, aggregate_type, aggregate_id, action, actor_id, actor_role,
+         before_state, after_state, ip_address, user_agent)
+       VALUES ($1, $2, 'PRODUCTION_ENTRY', $3, $4, $5, $6,
+         $7::jsonb, $8::jsonb, $9, $10)`,
+      [
+        uuidv7(),
+        tenantId,
+        entryId,
+        action,
+        actor.sub,
+        actor.role,
+        JSON.stringify(beforeState),
+        JSON.stringify(afterState),
+        metadata.ipAddress ?? null,
+        metadata.userAgent ?? null,
+      ],
+    );
+  }
+
+  private async requireEntryView(
+    manager: EntityManager,
+    tenantId: string,
+    entryId: string,
+  ): Promise<OperationEntryView> {
+    const rows = await manager.query<OperationEntryView[]>(
+      `SELECT
+         pe.id,
+         pe.worker_id,
+         pe.operation_id,
+         pe.status,
+         json_build_object(
+           'id', u.id,
+           'full_name', u.full_name,
+           'worker_code', u.worker_code
+         ) AS worker,
+         json_build_object(
+           'id', o.id,
+           'name', o.name,
+           'unit', o.unit
+         ) AS operation,
+         pe.operation_name_snapshot,
+         pe.operation_code_snapshot,
+         pe.quantity AS quantity_submitted,
+         CASE WHEN pe.status = 'APPROVED' THEN pe.quantity ELSE NULL END AS quantity_approved,
+         pe.unit_price_snapshot,
+         pe.currency_snapshot,
+         pe.record_date::text AS record_date,
+         pe.worker_note,
+         pe.created_at AS submitted_at,
+         CASE WHEN fa.id IS NULL THEN NULL
+           ELSE json_build_object('id', fm.id, 'full_name', fm.full_name)
+         END AS foreman,
+         pe.approved_at,
+         pe.rejected_at,
+         pe.approved_by,
+         pe.rejected_by,
+         pe.rejection_reason,
+         pe.foreman_note,
+         pe.correction_comment
+       FROM production_entries pe
+       JOIN users u
+         ON u.tenant_id = pe.tenant_id AND u.id = pe.worker_id
+       JOIN operations o
+         ON o.tenant_id = pe.tenant_id AND o.id = pe.operation_id
+       LEFT JOIN foreman_assignments fa
+         ON fa.tenant_id = pe.tenant_id
+        AND fa.worker_id = pe.worker_id
+        AND fa.unassigned_at IS NULL
+       LEFT JOIN users fm
+         ON fm.tenant_id = fa.tenant_id AND fm.id = fa.foreman_id
+       WHERE pe.tenant_id = $1 AND pe.id = $2`,
+      [tenantId, entryId],
+    );
+    const entry = rows[0];
+    if (!entry) {
+      throw new EntryNotFoundError();
+    }
+    return entry;
   }
 
   private async validateWorker(

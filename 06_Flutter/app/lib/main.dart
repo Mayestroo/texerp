@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:ui';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -12,6 +14,7 @@ import 'package:texerp/features/auth/data/auth_repository.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/profile/data/profile_repository.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
+import 'package:texerp/features/production/data/production_repository.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 void main() {
@@ -45,6 +48,8 @@ void main() {
   };
 
   final profileRepository = ProfileRepository(apiClient: apiClient);
+  final productionRepository = ProductionRepository(apiClient: apiClient);
+
   final profileBloc = ProfileBloc(
     profileRepository: profileRepository,
     authRepository: authRepository,
@@ -61,6 +66,8 @@ void main() {
       appRouter: appRouter,
       authRepository: authRepository,
       profileRepository: profileRepository,
+      productionRepository: productionRepository,
+      secureStorage: secureStorage,
     ),
   );
 }
@@ -73,6 +80,8 @@ class TexERPApp extends StatelessWidget {
     required this.appRouter,
     required this.authRepository,
     required this.profileRepository,
+    required this.productionRepository,
+    required this.secureStorage,
     super.key,
   });
 
@@ -82,6 +91,8 @@ class TexERPApp extends StatelessWidget {
   final AppRouter appRouter;
   final AuthRepository authRepository;
   final ProfileRepository profileRepository;
+  final ProductionRepository productionRepository;
+  final SecureStorage secureStorage;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +100,8 @@ class TexERPApp extends StatelessWidget {
       providers: [
         RepositoryProvider.value(value: authRepository),
         RepositoryProvider.value(value: profileRepository),
+        RepositoryProvider.value(value: productionRepository),
+        RepositoryProvider.value(value: secureStorage),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -97,24 +110,29 @@ class TexERPApp extends StatelessWidget {
           BlocProvider.value(value: localeCubit),
         ],
         child: BlocBuilder<LocaleCubit, Locale>(
-          builder: (context, locale) => MaterialApp.router(
-            title: 'TexERP',
-            debugShowCheckedModeBanner: false,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('uz'),
-              Locale('ru'),
-            ],
-            locale: locale,
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            routerConfig: appRouter.router,
-          ),
+          builder: (context, locale) {
+            final brightness = PlatformDispatcher.instance.platformBrightness;
+            final isDark = brightness == Brightness.dark;
+
+            return CupertinoApp.router(
+              title: 'TexERP',
+              debugShowCheckedModeBanner: false,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('uz'),
+                Locale('ru'),
+              ],
+              locale: locale,
+              theme:
+                  isDark ? AppTheme.cupertinoDark : AppTheme.cupertinoLight,
+              routerConfig: appRouter.router,
+            );
+          },
         ),
       ),
     );

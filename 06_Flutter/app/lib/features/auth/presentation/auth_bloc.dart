@@ -55,19 +55,33 @@ class AuthAccessTokenRefreshed extends AuthEvent {
   List<Object?> get props => [accessToken];
 }
 
+class AuthUnlockRequested extends AuthEvent {
+  const AuthUnlockRequested();
+}
+
+class AuthPinUpdated extends AuthEvent {
+  const AuthPinUpdated({required this.newPin});
+
+  final String newPin;
+
+  @override
+  List<Object?> get props => [newPin];
+}
+
 // ---------------------------------------------------------------------------
 // States
 // ---------------------------------------------------------------------------
 
 abstract class AuthState extends Equatable {
-  const AuthState({this.accessToken, this.user, this.currentPin});
+  const AuthState({this.accessToken, this.user, this.currentPin, this.isLocked = false});
 
   final String? accessToken;
   final UserProfile? user;
   final String? currentPin;
+  final bool isLocked;
 
   @override
-  List<Object?> get props => [accessToken, user, currentPin];
+  List<Object?> get props => [accessToken, user, currentPin, isLocked];
 }
 
 class AuthInitial extends AuthState {
@@ -83,6 +97,7 @@ class AuthAuthenticated extends AuthState {
     required super.user,
     required super.accessToken,
     super.currentPin,
+    super.isLocked = false,
   });
 
   @override
@@ -121,6 +136,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthRefreshRequested>(_onRefreshRequested);
     on<AuthSessionExpired>(_onSessionExpired);
     on<AuthAccessTokenRefreshed>(_onAccessTokenRefreshed);
+    on<AuthUnlockRequested>(_onUnlockRequested);
+    on<AuthPinUpdated>(_onPinUpdated);
 
     add(const AuthCheckStatus());
   }
@@ -186,7 +203,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     try {
       final accessToken = await _authRepository.refreshToken(refreshToken);
-      // Decode user ID from JWT to fetch profile
       final parts = accessToken.split('.');
       final payload = String.fromCharCodes(
         base64Url.decode(base64Url.normalize(parts[1])),
@@ -194,7 +210,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final decoded = jsonDecode(payload) as Map<String, dynamic>;
       final userId = decoded['sub'] as String;
       final user = await _authRepository.getProfile(userId);
-      emit(AuthAuthenticated(user: user, accessToken: accessToken));
+      final usePinLock = await _secureStorage.getUsePinLock();
+      emit(
+        AuthAuthenticated(
+          user: user,
+          accessToken: accessToken,
+          isLocked: usePinLock,
+        ),
+      );
+    } on NetworkException catch (e) {
+      if (e.code == 'NETWORK_ERROR') {
+        emit(AuthFailure(error: e));
+        emit(const AuthUnauthenticated());
+      } else {
+        await _secureStorage.clearTokens();
+        _tokenProvider.accessToken = null;
+        emit(const AuthUnauthenticated());
+      }
     } catch (_) {
       await _secureStorage.clearTokens();
       _tokenProvider.accessToken = null;
@@ -220,7 +252,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final decoded = jsonDecode(payload) as Map<String, dynamic>;
       final userId = decoded['sub'] as String;
       final user = state.user ?? await _authRepository.getProfile(userId);
-      emit(AuthAuthenticated(user: user, accessToken: accessToken));
+      emit(
+        AuthAuthenticated(
+          user: user,
+          accessToken: accessToken,
+          isLocked: state.isLocked,
+        ),
+      );
+    } on NetworkException catch (e) {
+      if (e.code == 'NETWORK_ERROR') {
+        emit(AuthFailure(error: e));
+        emit(const AuthUnauthenticated());
+      } else {
+        await _secureStorage.clearTokens();
+        _tokenProvider.accessToken = null;
+        emit(const AuthUnauthenticated());
+      }
     } catch (_) {
       await _secureStorage.clearTokens();
       _tokenProvider.accessToken = null;
@@ -248,6 +295,41 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           user: current,
           accessToken: event.accessToken,
           currentPin: state.currentPin,
+          isLocked: state.isLocked,
+        ),
+      );
+    }
+  }
+
+  void _onUnlockRequested(
+    AuthUnlockRequested event,
+    Emitter<AuthState> emit,
+  ) {
+    final current = state.user;
+    if (current != null && state is AuthAuthenticated) {
+      emit(
+        AuthAuthenticated(
+          user: current,
+          accessToken: state.accessToken,
+          currentPin: state.currentPin,
+          isLocked: false,
+        ),
+      );
+    }
+  }
+
+  void _onPinUpdated(
+    AuthPinUpdated event,
+    Emitter<AuthState> emit,
+  ) {
+    final current = state.user;
+    if (current != null && state is AuthAuthenticated) {
+      emit(
+        AuthAuthenticated(
+          user: current,
+          accessToken: state.accessToken,
+          currentPin: event.newPin,
+          isLocked: state.isLocked,
         ),
       );
     }
