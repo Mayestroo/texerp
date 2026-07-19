@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:texerp/core/theme/app_theme.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/shared/placeholder_screen.dart';
+import 'package:texerp/features/shared/director_dashboard_screen.dart';
 import 'package:texerp/features/production/data/production_repository.dart';
 import 'package:texerp/features/production/presentation/production_bloc.dart';
 import 'package:texerp/features/production/presentation/submit_entry_screen.dart';
@@ -22,6 +23,10 @@ import 'package:texerp/features/profile/presentation/workers_bloc.dart';
 import 'package:texerp/features/profile/presentation/workers_management_screen.dart';
 import 'package:texerp/features/profile/presentation/departments_bloc.dart';
 import 'package:texerp/features/profile/presentation/departments_management_screen.dart';
+import 'package:texerp/features/payroll/data/payroll_repository.dart';
+import 'package:texerp/features/payroll/presentation/payroll_bloc.dart';
+import 'package:texerp/features/payroll/presentation/payroll_period_list_screen.dart';
+import 'package:texerp/features/payroll/presentation/worker_payroll_screen.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class _RoleTab {
@@ -75,7 +80,12 @@ class AccountantHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _RoleBasedShell(role: 'ACCOUNTANT');
+    return BlocProvider(
+      create: (context) => PayrollBloc(
+        payrollRepository: context.read<PayrollRepository>(),
+      ),
+      child: const _RoleBasedShell(role: 'ACCOUNTANT'),
+    );
   }
 }
 
@@ -153,6 +163,7 @@ class _RoleBasedShellState extends State<_RoleBasedShell> {
           _RoleTab(label: l10n.home, icon: CupertinoIcons.house, activeIcon: CupertinoIcons.house_fill, title: l10n.home),
           _RoleTab(label: l10n.submit, icon: CupertinoIcons.plus_rectangle_on_rectangle, activeIcon: CupertinoIcons.plus_rectangle_fill_on_rectangle_fill, title: l10n.submit),
           _RoleTab(label: l10n.history, icon: CupertinoIcons.time, activeIcon: CupertinoIcons.time_solid, title: l10n.history),
+          _RoleTab(label: l10n.periods, icon: CupertinoIcons.money_dollar, activeIcon: CupertinoIcons.money_dollar_circle_fill, title: 'Maosh'),
         ];
     }
   }
@@ -371,6 +382,13 @@ class _RoleBasedShellState extends State<_RoleBasedShell> {
         return const SubmitEntryScreen();
       } else if (index == 2) {
         return const EntryHistoryScreen();
+      } else if (index == 3) {
+        return BlocProvider(
+          create: (context) => PayrollBloc(
+            payrollRepository: context.read<PayrollRepository>(),
+          ),
+          child: const WorkerPayrollScreen(),
+        );
       }
     } else if (role == 'FOREMAN') {
       if (index == 1) {
@@ -378,8 +396,14 @@ class _RoleBasedShellState extends State<_RoleBasedShell> {
       } else if (index == 2) {
         return const TeamScreen();
       }
-    } else if (role == 'DIRECTOR') {
+    } else if (role == 'ACCOUNTANT') {
       if (index == 1) {
+        return const PayrollPeriodListScreen();
+      }
+    } else if (role == 'DIRECTOR') {
+      if (index == 0) {
+        return const DirectorDashboardScreen();
+      } else if (index == 1) {
         return const WorkersManagementScreen();
       } else if (index == 2) {
         return const DepartmentsManagementScreen();

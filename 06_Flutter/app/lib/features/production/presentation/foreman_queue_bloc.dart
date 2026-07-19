@@ -56,16 +56,20 @@ class ForemanQueueState {
     List<ProductionEntry>? pendingEntries,
     bool? isLoading,
     String? error,
-    String? actionInProgressId,
-    String? actionError,
+    Object? actionInProgressId = const Object(),
+    Object? actionError = const Object(),
     bool? actionSuccess,
   }) {
     return ForemanQueueState(
       pendingEntries: pendingEntries ?? this.pendingEntries,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      actionInProgressId: actionInProgressId ?? this.actionInProgressId,
-      actionError: actionError ?? this.actionError,
+      actionInProgressId: actionInProgressId == const Object()
+          ? this.actionInProgressId
+          : (actionInProgressId as String?),
+      actionError: actionError == const Object()
+          ? this.actionError
+          : (actionError as String?),
       actionSuccess: actionSuccess ?? this.actionSuccess,
     );
   }

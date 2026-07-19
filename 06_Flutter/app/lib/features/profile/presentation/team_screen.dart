@@ -45,48 +45,61 @@ class _TeamScreenState extends State<TeamScreen> {
         }
 
         if (state.error != null && state.workers.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle_fill,
-                    color: AppColors.error,
-                    size: 44,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Jamoani yuklashda xatolik',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    state.error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  CupertinoButton(
-                    color: AppColors.primary,
-                    onPressed: () {
-                      context.read<TeamBloc>().add(const TeamLoadRequested());
-                    },
-                    child: const Text('Qayta yuklash'),
-                  ),
-                ],
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              CupertinoSliverRefreshControl(
+                onRefresh: () async {
+                  context.read<TeamBloc>().add(const TeamLoadRequested());
+                },
               ),
-            ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          color: AppColors.error,
+                          size: 44,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Jamoani yuklashda xatolik',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          state.error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        CupertinoButton(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: () {
+                            context.read<TeamBloc>().add(const TeamLoadRequested());
+                          },
+                          child: const Text('Qayta yuklash'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -108,13 +121,38 @@ class _TeamScreenState extends State<TeamScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: CupertinoSearchTextField(
+                child: CupertinoTextField(
                   placeholder: 'Jamoa a\'zolarini qidirish...',
+                  placeholderStyle: TextStyle(
+                    color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                    fontSize: 14,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  clearButtonMode: OverlayVisibilityMode.editing,
                   onChanged: (val) {
                     setState(() {
                       _searchQuery = val;
                     });
                   },
+                  prefix: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Icon(
+                      CupertinoIcons.search,
+                      size: 18,
+                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                    ),
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+                    ),
+                  ),
+                  style: TextStyle(
+                    color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ),
@@ -167,19 +205,25 @@ class _TeamScreenState extends State<TeamScreen> {
                     (context, index) {
                       final worker = filteredWorkers[index];
                       final isActive = worker.status == 'ACTIVE';
+                      final initials = worker.fullName
+                          .split(' ')
+                          .map((e) => e.isNotEmpty ? e[0] : '')
+                          .take(2)
+                          .join()
+                          .toUpperCase();
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isDark ? AppColors.cardDark : AppColors.cardLight,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000),
+                            color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: CupertinoColors.black.withOpacity(0.02),
+                              color: CupertinoColors.black.withOpacity(isDark ? 0.2 : 0.02),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -197,15 +241,14 @@ class _TeamScreenState extends State<TeamScreen> {
                                     color: primaryColor.withOpacity(0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      worker.fullName.substring(0, 1).toUpperCase(),
-                                      style: TextStyle(
-                                        color: primaryColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        inherit: false,
-                                      ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    initials.isNotEmpty ? initials : "?",
+                                    style: TextStyle(
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      inherit: false,
                                     ),
                                   ),
                                 ),
@@ -242,33 +285,53 @@ class _TeamScreenState extends State<TeamScreen> {
                                       inherit: false,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0A000000),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          worker.workerCode,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                                            inherit: false,
+                                          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000),
                                           ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(CupertinoIcons.number, size: 10, color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              worker.workerCode,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                                inherit: false,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       if (worker.department != null) ...[
                                         const SizedBox(width: 6),
-                                        Text(
-                                          worker.department!.name,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                                            inherit: false,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: primaryColor.withOpacity(0.06),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: primaryColor.withOpacity(0.12),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            worker.department!.name,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: primaryColor,
+                                              inherit: false,
+                                            ),
                                           ),
                                         ),
                                       ],

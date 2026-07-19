@@ -8,7 +8,8 @@ abstract class DepartmentsEvent {
 }
 
 class DepartmentsLoadRequested extends DepartmentsEvent {
-  const DepartmentsLoadRequested();
+  const DepartmentsLoadRequested({this.includeInactive = false});
+  final bool includeInactive;
 }
 
 class DepartmentsCreateRequested extends DepartmentsEvent {
@@ -70,18 +71,22 @@ class DepartmentsState {
     List<UserProfile>? foremen,
     bool? isLoading,
     String? error,
-    String? actionInProgressId,
+    Object? actionInProgressId = const Object(),
     bool? actionSuccess,
-    String? actionError,
+    Object? actionError = const Object(),
   }) {
     return DepartmentsState(
       departments: departments ?? this.departments,
       foremen: foremen ?? this.foremen,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      actionInProgressId: actionInProgressId ?? this.actionInProgressId,
+      actionInProgressId: actionInProgressId == const Object()
+          ? this.actionInProgressId
+          : (actionInProgressId as String?),
       actionSuccess: actionSuccess ?? this.actionSuccess,
-      actionError: actionError ?? this.actionError,
+      actionError: actionError == const Object()
+          ? this.actionError
+          : (actionError as String?),
     );
   }
 }
@@ -105,7 +110,7 @@ class DepartmentsBloc extends Bloc<DepartmentsEvent, DepartmentsState> {
     emit(state.copyWith(isLoading: true, error: null, actionSuccess: false));
     try {
       final results = await Future.wait([
-        _profileRepository.fetchDepartments(),
+        _profileRepository.fetchDepartments(includeInactive: event.includeInactive),
         _profileRepository.fetchUsers(role: 'FOREMAN', status: 'ACTIVE'),
       ]);
       final depts = results[0] as List<Department>;

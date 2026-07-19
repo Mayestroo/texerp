@@ -16,10 +16,18 @@ class DepartmentsManagementScreen extends StatefulWidget {
 
 class _DepartmentsManagementScreenState
     extends State<DepartmentsManagementScreen> {
+  bool _includeInactive = false;
+
   @override
   void initState() {
     super.initState();
-    context.read<DepartmentsBloc>().add(const DepartmentsLoadRequested());
+    _loadDepartments();
+  }
+
+  void _loadDepartments() {
+    context
+        .read<DepartmentsBloc>()
+        .add(DepartmentsLoadRequested(includeInactive: _includeInactive));
   }
 
   void _showAddSheet() {
@@ -37,253 +45,277 @@ class _DepartmentsManagementScreenState
           child: BlocBuilder<DepartmentsBloc, DepartmentsState>(
             builder: (context, state) {
               return Container(
-                height: MediaQuery.of(context).size.height * 0.6,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: MediaQuery.of(context).size.height * 0.78,
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemBackground.resolveFrom(context),
+                  color: isDark ? const Color(0xFF1C1C1E) : CupertinoColors.systemBackground.resolveFrom(context),
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
                 ),
                 child: SafeArea(
                   top: false,
                   child: StatefulBuilder(
                     builder: (context, setModalState) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Yangi bo\'lim qo\'shish',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? AppColors.labelDark
-                                        : AppColors.labelLight,
-                                    inherit: false,
+                      return SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Drag handle
+                            Center(
+                              child: Container(
+                                width: 36,
+                                height: 5,
+                                margin: const EdgeInsets.only(top: 8, bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFC7C7CC),
+                                  borderRadius: BorderRadius.circular(2.5),
+                                ),
+                              ),
+                            ),
+                            // Header
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Yangi bo\'lim qo\'shish',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                      inherit: false,
+                                    ),
                                   ),
-                                ),
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: const Text('Bekor qilish'),
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Bo\'lim nomi',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          CupertinoTextField(
-                            controller: nameController,
-                            placeholder: 'Masalan: Tikuv sexi',
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Bo\'lim kodi',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          CupertinoTextField(
-                            controller: codeController,
-                            placeholder: 'Masalan: SEW-01',
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Mas\'ul prorab',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF1C1C1E)
-                                          : CupertinoColors.white,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isDark
-                                            ? const Color(0x33FFFFFF)
-                                            : const Color(0x22000000),
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        CupertinoIcons.xmark,
+                                        size: 16,
+                                        color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            selectedForemanId == null
-                                                ? 'Prorabni tanlang'
-                                                : state.foremen
-                                                    .firstWhere(
-                                                      (f) =>
-                                                          f.id ==
-                                                          selectedForemanId,
-                                                      orElse: () =>
-                                                          UserProfile(
-                                                              id: '',
-                                                              fullName:
-                                                                  'Noma\'lum',
-                                                              phone: '',
-                                                              workerCode: '',
-                                                              role: '',
-                                                              status: ''),
-                                                    )
-                                                    .fullName,
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: selectedForemanId == null
-                                                  ? (isDark
-                                                      ? AppColors
-                                                          .labelTertiary
-                                                      : AppColors
-                                                          .secondaryLabelLight)
-                                                  : (isDark
-                                                      ? AppColors.labelDark
-                                                      : AppColors.labelLight),
-                                              inherit: false,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Icon(
-                                          CupertinoIcons.chevron_down,
-                                          size: 18,
-                                          color: isDark
-                                              ? AppColors.labelTertiary
-                                              : AppColors.secondaryLabelLight,
-                                        ),
-                                      ],
-                                    ),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
-                                  onPressed: () {
-                                    if (state.foremen.isEmpty) {
-                                      AppToast.show(context,
-                                          message:
-                                              'Avval prorab yarating',
-                                          type: ToastType.error);
-                                      return;
-                                    }
-                                    showCupertinoModalPopup<void>(
-                                      context: context,
-                                      builder: (context) {
-                                        return Container(
-                                          height: 250,
-                                          color: CupertinoColors
-                                              .systemBackground
-                                              .resolveFrom(context),
-                                          child: CupertinoPicker(
-                                            itemExtent: 32,
-                                            onSelectedItemChanged: (index) {
-                                              setModalState(() {
-                                                selectedForemanId =
-                                                    state.foremen[index].id;
-                                              });
-                                            },
-                                            children: state.foremen
-                                                .map((f) => Center(
-                                                    child: Text(f.fullName)))
-                                                .toList(),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                                ],
+                              ),
+                            ),
+                            
+                            // Name Input
+                            Text(
+                              'Bo\'lim nomi',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.w600,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            CupertinoTextField(
+                              controller: nameController,
+                              placeholder: 'Masalan: Tikuv sexi',
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              clearButtonMode: OverlayVisibilityMode.editing,
+                              prefix: Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  CupertinoIcons.square_grid_2x2,
+                                  size: 18,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                 ),
                               ),
-                            ],
-                          ),
-                          const Spacer(),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () {
-                              final name = nameController.text.trim();
-                              final code = codeController.text.trim();
-                              if (name.isEmpty) {
-                                AppToast.show(context,
-                                    message: 'Bo\'lim nomini kiriting',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              if (code.isEmpty) {
-                                AppToast.show(context,
-                                    message: 'Bo\'lim kodini kiriting',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              if (selectedForemanId == null) {
-                                AppToast.show(context,
-                                    message: 'Prorabni tanlang',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              Navigator.of(context).pop();
-                              this.context.read<DepartmentsBloc>().add(
-                                    DepartmentsCreateRequested(
-                                      name: name,
-                                      code: code,
-                                      foremanId: selectedForemanId!,
-                                    ),
-                                  );
-                            },
-                            child: Container(
-                              height: 52,
-                              width: double.infinity,
-                              alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(14),
+                                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000),
+                                ),
                               ),
-                              child: const Text(
-                                'Bo\'limni yaratish',
-                                style: TextStyle(
-                                  color: CupertinoColors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              style: TextStyle(
+                                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 16),
+
+                            // Code Input
+                            Text(
+                              'Bo\'lim kodi',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.w600,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            CupertinoTextField(
+                              controller: codeController,
+                              placeholder: 'Masalan: SEW-01',
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              clearButtonMode: OverlayVisibilityMode.editing,
+                              prefix: Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  CupertinoIcons.number,
+                                  size: 18,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                ),
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000),
+                                ),
+                              ),
+                              style: TextStyle(
+                                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Foreman selection
+                            Text(
+                              'Mas\'ul prorab',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                  fontWeight: FontWeight.w600,
+                                  inherit: false,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (state.foremen.isEmpty)
+                                Text(
+                                  'Prorablar topilmadi. Avval prorab qo\'shish lozim.',
+                                  style: TextStyle(fontSize: 13, color: AppColors.error, inherit: false),
+                                )
+                              else
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: state.foremen.map((foreman) {
+                                    final isSelected = selectedForemanId == foreman.id;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setModalState(() {
+                                          selectedForemanId = foreman.id;
+                                        });
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 150),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7)),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppColors.primaryLight
+                                                : (isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000)),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                                              size: 16,
+                                              color: isSelected
+                                                  ? CupertinoColors.white
+                                                  : (isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              foreman.fullName,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                                color: isSelected
+                                                    ? CupertinoColors.white
+                                                    : (isDark ? AppColors.labelDark : AppColors.labelLight),
+                                                inherit: false,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+
+                            const SizedBox(height: 24),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                final name = nameController.text.trim();
+                                final code = codeController.text.trim();
+                                if (name.isEmpty) {
+                                  AppToast.show(context, message: 'Bo\'lim nomini kiriting', type: ToastType.error);
+                                    return;
+                                }
+                                if (code.isEmpty) {
+                                  AppToast.show(context, message: 'Bo\'lim kodini kiriting', type: ToastType.error);
+                                    return;
+                                }
+                                if (selectedForemanId == null) {
+                                  AppToast.show(context, message: 'Prorabni tanlang', type: ToastType.error);
+                                    return;
+                                }
+                                Navigator.of(context).pop();
+                                this.context.read<DepartmentsBloc>().add(
+                                      DepartmentsCreateRequested(
+                                        name: name,
+                                        code: code,
+                                        foremanId: selectedForemanId!,
+                                      ),
+                                    );
+                              },
+                              child: Container(
+                                height: 52,
+                                width: double.infinity,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Text(
+                                  'Bo\'limni yaratish',
+                                  style: TextStyle(
+                                    color: CupertinoColors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -320,257 +352,278 @@ class _DepartmentsManagementScreenState
               }
 
               return Container(
-                height: MediaQuery.of(context).size.height * 0.6,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: MediaQuery.of(context).size.height * 0.78,
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemBackground.resolveFrom(context),
+                  color: isDark ? const Color(0xFF1C1C1E) : CupertinoColors.systemBackground.resolveFrom(context),
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
                 ),
                 child: SafeArea(
                   top: false,
                   child: StatefulBuilder(
                     builder: (context, setModalState) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Bo\'limni tahrirlash',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? AppColors.labelDark
-                                        : AppColors.labelLight,
-                                    inherit: false,
+                      return SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Drag handle
+                            Center(
+                              child: Container(
+                                width: 36,
+                                height: 5,
+                                margin: const EdgeInsets.only(top: 8, bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFC7C7CC),
+                                  borderRadius: BorderRadius.circular(2.5),
+                                ),
+                              ),
+                            ),
+                            // Header
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Bo\'limni tahrirlash',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                      inherit: false,
+                                    ),
                                   ),
-                                ),
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: const Text('Bekor qilish'),
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Bo\'lim nomi',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          CupertinoTextField(
-                            controller: nameController,
-                            placeholder: 'Bo\'lim nomi',
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Bo\'lim kodi',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          CupertinoTextField(
-                            controller: codeController,
-                            placeholder: 'Bo\'lim kodi',
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Mas\'ul prorab',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.labelSecondary
-                                  : AppColors.secondaryLabelLight,
-                              fontWeight: FontWeight.w500,
-                              inherit: false,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF1C1C1E)
-                                          : CupertinoColors.white,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isDark
-                                            ? const Color(0x33FFFFFF)
-                                            : const Color(0x22000000),
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        CupertinoIcons.xmark,
+                                        size: 16,
+                                        color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            selectedForemanId == null
-                                                ? 'Prorabni tanlang'
-                                                : state.foremen
-                                                    .firstWhere(
-                                                      (f) =>
-                                                          f.id ==
-                                                          selectedForemanId,
-                                                      orElse: () =>
-                                                          UserProfile(
-                                                              id: '',
-                                                              fullName:
-                                                                  'Noma\'lum',
-                                                              phone: '',
-                                                              workerCode: '',
-                                                              role: '',
-                                                              status: ''),
-                                                    )
-                                                    .fullName,
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: selectedForemanId == null
-                                                  ? (isDark
-                                                      ? AppColors
-                                                          .labelTertiary
-                                                      : AppColors
-                                                          .secondaryLabelLight)
-                                                  : (isDark
-                                                      ? AppColors.labelDark
-                                                      : AppColors.labelLight),
-                                              inherit: false,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Icon(
-                                          CupertinoIcons.chevron_down,
-                                          size: 18,
-                                          color: isDark
-                                              ? AppColors.labelTertiary
-                                              : AppColors.secondaryLabelLight,
-                                        ),
-                                      ],
-                                    ),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
-                                  onPressed: () {
-                                    if (state.foremen.isEmpty) {
-                                      AppToast.show(context,
-                                          message:
-                                              'Avval prorab yarating',
-                                          type: ToastType.error);
-                                      return;
-                                    }
-                                    showCupertinoModalPopup<void>(
-                                      context: context,
-                                      builder: (context) {
-                                        return Container(
-                                          height: 250,
-                                          color: CupertinoColors
-                                              .systemBackground
-                                              .resolveFrom(context),
-                                          child: CupertinoPicker(
-                                            itemExtent: 32,
-                                            onSelectedItemChanged: (index) {
-                                              setModalState(() {
-                                                selectedForemanId =
-                                                    state.foremen[index].id;
-                                              });
-                                            },
-                                            children: state.foremen
-                                                .map((f) => Center(
-                                                    child: Text(f.fullName)))
-                                                .toList(),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                                ],
+                              ),
+                            ),
+                            
+                            // Name Input
+                            Text(
+                              'Bo\'lim nomi',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.w600,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            CupertinoTextField(
+                              controller: nameController,
+                              placeholder: 'Bo\'lim nomi',
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              clearButtonMode: OverlayVisibilityMode.editing,
+                              prefix: Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  CupertinoIcons.square_grid_2x2,
+                                  size: 18,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                 ),
                               ),
-                            ],
-                          ),
-                          const Spacer(),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () {
-                              final name = nameController.text.trim();
-                              final code = codeController.text.trim();
-                              if (name.isEmpty) {
-                                AppToast.show(context,
-                                    message: 'Bo\'lim nomini kiriting',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              if (code.isEmpty) {
-                                AppToast.show(context,
-                                    message: 'Bo\'lim kodini kiriting',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              if (selectedForemanId == null) {
-                                AppToast.show(context,
-                                    message: 'Prorabni tanlang',
-                                    type: ToastType.error);
-                                return;
-                              }
-                              Navigator.of(context).pop();
-                              this.context.read<DepartmentsBloc>().add(
-                                    DepartmentsUpdateRequested(
-                                      id: dept.id,
-                                      name:
-                                          name != dept.name ? name : null,
-                                      code: code != (dept.code ?? '')
-                                          ? code
-                                          : null,
-                                      foremanId: selectedForemanId,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000),
+                                ),
+                              ),
+                              style: TextStyle(
+                                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 16),
+
+                            // Code Input
+                            Text(
+                              'Bo\'lim kodi',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.w600,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            CupertinoTextField(
+                              controller: codeController,
+                              placeholder: 'Bo\'lim kodi',
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              clearButtonMode: OverlayVisibilityMode.editing,
+                              prefix: Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Icon(
+                                  CupertinoIcons.number,
+                                  size: 18,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                ),
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x33FFFFFF) : const Color(0x1F000000),
+                                ),
+                              ),
+                              style: TextStyle(
+                                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Foreman selection
+                            Text(
+                              'Mas\'ul prorab',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.w600,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (state.foremen.isEmpty)
+                              Text(
+                                'Prorablar topilmadi. Avval prorab qo\'shish lozim.',
+                                style: TextStyle(fontSize: 13, color: AppColors.error, inherit: false),
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: state.foremen.map((foreman) {
+                                  final isSelected = selectedForemanId == foreman.id;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        selectedForemanId = foreman.id;
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7)),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? AppColors.primaryLight
+                                              : (isDark ? const Color(0x1AFFFFFF) : const Color(0x1F000000)),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                                            size: 16,
+                                            color: isSelected
+                                                ? CupertinoColors.white
+                                                : (isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            foreman.fullName,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected
+                                                  ? CupertinoColors.white
+                                                  : (isDark ? AppColors.labelDark : AppColors.labelLight),
+                                              inherit: false,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   );
-                            },
-                            child: Container(
-                              height: 52,
-                              width: double.infinity,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(14),
+                                }).toList(),
                               ),
-                              child: const Text(
-                                'Saqlash',
-                                style: TextStyle(
-                                  color: CupertinoColors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+
+                            const SizedBox(height: 24),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                final name = nameController.text.trim();
+                                final code = codeController.text.trim();
+                                if (name.isEmpty) {
+                                  AppToast.show(context, message: 'Bo\'lim nomini kiriting', type: ToastType.error);
+                                    return;
+                                }
+                                if (code.isEmpty) {
+                                  AppToast.show(context, message: 'Bo\'lim kodini kiriting', type: ToastType.error);
+                                    return;
+                                }
+                                if (selectedForemanId == null) {
+                                  AppToast.show(context, message: 'Prorabni tanlang', type: ToastType.error);
+                                    return;
+                                }
+                                Navigator.of(context).pop();
+                                this.context.read<DepartmentsBloc>().add(
+                                      DepartmentsUpdateRequested(
+                                        id: dept.id,
+                                        name: name != dept.name ? name : null,
+                                        code: code != (dept.code ?? '') ? code : null,
+                                        foremanId: selectedForemanId,
+                                      ),
+                                    );
+                              },
+                              child: Container(
+                                height: 52,
+                                width: double.infinity,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Text(
+                                  'Saqlash',
+                                  style: TextStyle(
+                                    color: CupertinoColors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+                            const SizedBox(height: 16),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -603,6 +656,7 @@ class _DepartmentsManagementScreenState
         if (state.actionSuccess) {
           AppToast.show(context,
               message: 'Muvaffaqiyatli bajarildi!', type: ToastType.success);
+          _loadDepartments();
         } else if (state.actionError != null) {
           AppToast.show(context,
               message: state.actionError!, type: ToastType.error);
@@ -616,9 +670,7 @@ class _DepartmentsManagementScreenState
           slivers: [
             CupertinoSliverRefreshControl(
               onRefresh: () async {
-                context
-                    .read<DepartmentsBloc>()
-                    .add(const DepartmentsLoadRequested());
+                _loadDepartments();
               },
             ),
             SliverToBoxAdapter(
@@ -640,6 +692,89 @@ class _DepartmentsManagementScreenState
                         ),
                       ),
                     ),
+                    // Status Filter Button
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        showCupertinoModalPopup<void>(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return CupertinoActionSheet(
+                              title: const Text('Holat bo\'yicha saralash'),
+                              actions: [
+                                CupertinoActionSheetAction(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    setState(() {
+                                      _includeInactive = false;
+                                    });
+                                    _loadDepartments();
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(CupertinoIcons.checkmark_circle_fill, color: AppColors.success, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Faollar',
+                                        style: TextStyle(
+                                          fontWeight: !_includeInactive ? FontWeight.bold : FontWeight.normal,
+                                          color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                CupertinoActionSheetAction(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    setState(() {
+                                      _includeInactive = true;
+                                    });
+                                    _loadDepartments();
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(CupertinoIcons.eye_slash_fill, color: AppColors.labelTertiary, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Hammasi (Faol/Nofaol)',
+                                        style: TextStyle(
+                                          fontWeight: _includeInactive ? FontWeight.bold : FontWeight.normal,
+                                          color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              cancelButton: CupertinoActionSheetAction(
+                                onPressed: () => Navigator.pop(context),
+                                isDefaultAction: true,
+                                child: const Text('Bekor qilish'),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _includeInactive
+                              ? AppColors.primary.withOpacity(0.1)
+                              : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7)),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _includeInactive ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
+                          color: _includeInactive ? AppColors.primary : (isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
                       onPressed: () => _showAddSheet(),
@@ -667,109 +802,103 @@ class _DepartmentsManagementScreenState
               )
             else if (state.error != null && state.departments.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.exclamationmark_triangle_fill,
-                          color: AppColors.error,
-                          size: 44,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Yuklashda xatolik',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? AppColors.labelDark
-                                : AppColors.labelLight,
-                            inherit: false,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.exclamationmark_triangle_fill,
+                            color: AppColors.error,
+                            size: 44,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          state.error!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? AppColors.labelSecondary
-                                : AppColors.secondaryLabelLight,
-                            inherit: false,
+                          const SizedBox(height: 16),
+                          Text(
+                            'Yuklashda xatolik',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              inherit: false,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        CupertinoButton(
-                          color: AppColors.primary,
-                          onPressed: () => context
-                              .read<DepartmentsBloc>()
-                              .add(const DepartmentsLoadRequested()),
-                          child: const Text('Qayta yuklash'),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            state.error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                              inherit: false,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          CupertinoButton(
+                            color: AppColors.primary,
+                            onPressed: _loadDepartments,
+                            child: const Text('Qayta yuklash'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               )
             else if (state.departments.isEmpty)
               SliverFillRemaining(
+                hasScrollBody: false,
                 child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.square_list,
-                          size: 64,
-                          color: isDark
-                              ? AppColors.labelTertiary
-                              : AppColors.secondaryLabelLight,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Bo\'limlar ro\'yxati bo\'sh',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? AppColors.labelDark
-                                : AppColors.labelLight,
-                            inherit: false,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.square_list,
+                            size: 64,
+                            color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Hozircha birorta ham bo\'lim qo\'shilmagan.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? AppColors.labelSecondary
-                                : AppColors.secondaryLabelLight,
-                            inherit: false,
+                          const SizedBox(height: 16),
+                          Text(
+                            'Bo\'limlar ro\'yxati bo\'sh',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                              inherit: false,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Hozircha birorta ham bo\'lim qo\'shilmagan.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                              inherit: false,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.only(
-                    left: 16, right: 16, bottom: 100),
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 100),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final dept = state.departments[index];
-                      final isCurrentBusy =
-                          state.actionInProgressId == dept.id;
+                      final isCurrentBusy = state.actionInProgressId == dept.id;
+                      final initials = dept.name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
+                      final isDeptActive = dept.isActive ?? true;
 
                       return Opacity(
                         opacity: isCurrentBusy ? 0.6 : 1.0,
@@ -777,180 +906,199 @@ class _DepartmentsManagementScreenState
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? AppColors.cardDark
-                                : AppColors.cardLight,
-                            borderRadius: BorderRadius.circular(16),
+                            color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isDark
-                                  ? const Color(0x11FFFFFF)
-                                  : const Color(0x11000000),
+                              color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDark ? const Color(0x0D000000) : const Color(0x08000000),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () => _showEditSheet(dept),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                              Row(
+                                children: [
+                                  // Initials Avatar
+                                  GestureDetector(
+                                    onTap: () => _showEditSheet(dept),
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: primaryColor.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        initials.isNotEmpty ? initials : "?",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: primaryColor,
+                                          inherit: false,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  
+                                  // Details Column
+                                  Expanded(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () => _showEditSheet(dept),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            dept.name,
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark
-                                                  ? AppColors.labelDark
-                                                  : AppColors.labelLight,
-                                              inherit: false,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  dept.name,
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                                    inherit: false,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              if (!isDeptActive)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.error.withOpacity(0.1),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    'Faolsiz',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppColors.error,
+                                                      inherit: false,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 8),
-                                          if (dept.isActive == false)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.error
-                                                    .withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                'Faolsiz',
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(CupertinoIcons.number, size: 12, color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                dept.code ?? 'Kodsiz',
                                                 style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.error,
-                                                  inherit: false,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          if (dept.code != null) ...[
-                                            Container(
-                                              padding: const EdgeInsets
-                                                      .symmetric(
-                                                  horizontal: 6,
-                                                  vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: isDark
-                                                    ? const Color(0x1AFFFFFF)
-                                                    : const Color(0x0A000000),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                dept.code!,
-                                                style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 12,
                                                   fontWeight: FontWeight.w600,
-                                                  color: isDark
-                                                      ? AppColors
-                                                          .labelSecondary
-                                                      : AppColors
-                                                          .secondaryLabelLight,
+                                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                                   inherit: false,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                          ],
-                                          if (dept.foremanName != null) ...[
-                                            Icon(
-                                              CupertinoIcons.person_fill,
-                                              size: 12,
-                                              color: isDark
-                                                  ? AppColors.labelTertiary
-                                                  : AppColors
-                                                      .secondaryLabelLight,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                dept.foremanName!,
-                                                maxLines: 1,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: isDark
-                                                      ? AppColors
-                                                          .labelSecondary
-                                                      : AppColors
-                                                          .secondaryLabelLight,
-                                                  inherit: false,
+                                              const SizedBox(width: 12),
+                                              Icon(CupertinoIcons.person_crop_circle, size: 12, color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  dept.foremanName ?? 'Mas\'ul biriktirilmagan',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                                    inherit: false,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ],
                                       ),
-                                      if (dept.workerCount != null &&
-                                          dept.workerCount! > 0) ...[
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          '${dept.workerCount} nafar ishchi',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.success,
-                                            fontStyle: FontStyle.italic,
-                                            inherit: false,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  
+                                  // Status Toggle Button
+                                  if (isCurrentBusy)
+                                    const CupertinoActivityIndicator()
+                                  else
+                                    CupertinoButton(
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () => _toggleStatus(dept),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 150),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: isDeptActive
+                                              ? AppColors.error.withOpacity(0.08)
+                                              : AppColors.success.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isDeptActive
+                                                ? AppColors.error.withOpacity(0.15)
+                                                : AppColors.success.withOpacity(0.15),
                                           ),
                                         ),
-                                      ],
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isDeptActive ? CupertinoIcons.eye_slash : CupertinoIcons.eye,
+                                              size: 13,
+                                              color: isDeptActive ? AppColors.error : AppColors.success,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isDeptActive ? 'Faolsizlash' : 'Faollash',
+                                              style: TextStyle(
+                                                color: isDeptActive ? AppColors.error : AppColors.success,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              
+                              // Workers Count Badge Strip
+                              if (dept.workerCount != null && dept.workerCount! > 0) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.success.withOpacity(0.15)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(CupertinoIcons.person_3, size: 14, color: AppColors.success),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${dept.workerCount} nafar xodim',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.success,
+                                          inherit: false,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              if (isCurrentBusy)
-                                const CupertinoActivityIndicator()
-                              else
-                                CupertinoButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () => _toggleStatus(dept),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: (dept.isActive ?? true)
-                                          ? AppColors.error.withOpacity(0.08)
-                                          : AppColors.success
-                                              .withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: (dept.isActive ?? true)
-                                            ? AppColors.error.withOpacity(0.2)
-                                            : AppColors.success
-                                                .withOpacity(0.2),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      (dept.isActive ?? true)
-                                          ? 'Faolsizlash'
-                                          : 'Faollash',
-                                      style: TextStyle(
-                                        color: (dept.isActive ?? true)
-                                            ? AppColors.error
-                                            : AppColors.success,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                              ],
                             ],
                           ),
                         ),

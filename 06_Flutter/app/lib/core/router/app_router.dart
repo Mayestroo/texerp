@@ -15,6 +15,9 @@ import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:texerp/features/profile/presentation/profile_screen.dart';
 import 'package:texerp/features/shared/role_based_shell.dart';
 import 'package:texerp/features/auth/presentation/lock_screen.dart';
+import 'package:texerp/features/payroll/data/payroll_repository.dart';
+import 'package:texerp/features/payroll/presentation/payroll_bloc.dart';
+import 'package:texerp/features/payroll/presentation/payroll_period_detail_screen.dart';
 
 class _FadePage extends CustomTransitionPage<void> {
   _FadePage({required super.child, super.key})
@@ -131,6 +134,20 @@ class AppRouter {
                   onLogout: () => _authBloc.add(const AuthLogoutRequested()),
                 ),
                 child: const ProfileScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/payroll/periods/:id',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => PayrollBloc(
+                  payrollRepository: context.read<PayrollRepository>(),
+                ),
+                child: PayrollPeriodDetailScreen(
+                  periodId: state.pathParameters['id']!,
+                ),
               ),
             ),
           ),

@@ -9,6 +9,7 @@ import { OperationsModule } from './modules/operations/operations.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { ProductionModule } from './modules/production/production.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ProductionModule } from './modules/production/production.module';
     OperationsModule,
     OrganizationModule,
     ProductionModule,
+    PayrollModule,
     HealthModule,
   ],
 })

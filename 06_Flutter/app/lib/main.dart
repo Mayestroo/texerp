@@ -15,6 +15,7 @@ import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/profile/data/profile_repository.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:texerp/features/production/data/production_repository.dart';
+import 'package:texerp/features/payroll/data/payroll_repository.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 void main() {
@@ -25,7 +26,7 @@ void main() {
   final localeCubit = LocaleCubit();
 
   final apiClient = ApiClient(
-    baseUrl: 'http://192.168.43.103:3000/api/v1',
+    baseUrl: 'http://192.168.1.10:3000/api/v1',
     secureStorage: secureStorage,
     tokenProvider: tokenProvider,
     localeCubit: localeCubit,
@@ -49,6 +50,7 @@ void main() {
 
   final profileRepository = ProfileRepository(apiClient: apiClient);
   final productionRepository = ProductionRepository(apiClient: apiClient);
+  final payrollRepository = PayrollRepository(apiClient: apiClient);
 
   final profileBloc = ProfileBloc(
     profileRepository: profileRepository,
@@ -67,6 +69,7 @@ void main() {
       authRepository: authRepository,
       profileRepository: profileRepository,
       productionRepository: productionRepository,
+      payrollRepository: payrollRepository,
       secureStorage: secureStorage,
     ),
   );
@@ -81,6 +84,7 @@ class TexERPApp extends StatelessWidget {
     required this.authRepository,
     required this.profileRepository,
     required this.productionRepository,
+    required this.payrollRepository,
     required this.secureStorage,
     super.key,
   });
@@ -92,6 +96,7 @@ class TexERPApp extends StatelessWidget {
   final AuthRepository authRepository;
   final ProfileRepository profileRepository;
   final ProductionRepository productionRepository;
+  final PayrollRepository payrollRepository;
   final SecureStorage secureStorage;
 
   @override
@@ -101,6 +106,7 @@ class TexERPApp extends StatelessWidget {
         RepositoryProvider.value(value: authRepository),
         RepositoryProvider.value(value: profileRepository),
         RepositoryProvider.value(value: productionRepository),
+        RepositoryProvider.value(value: payrollRepository),
         RepositoryProvider.value(value: secureStorage),
       ],
       child: MultiBlocProvider(

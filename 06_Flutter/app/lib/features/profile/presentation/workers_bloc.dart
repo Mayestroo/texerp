@@ -105,9 +105,9 @@ class WorkersState {
     String? error,
     String? role,
     String? status,
-    String? actionInProgressId,
+    Object? actionInProgressId = const Object(),
     bool? actionSuccess,
-    String? actionError,
+    Object? actionError = const Object(),
   }) {
     return WorkersState(
       users: users ?? this.users,
@@ -118,9 +118,13 @@ class WorkersState {
       error: error ?? this.error,
       role: role ?? this.role,
       status: status ?? this.status,
-      actionInProgressId: actionInProgressId ?? this.actionInProgressId,
+      actionInProgressId: actionInProgressId == const Object()
+          ? this.actionInProgressId
+          : (actionInProgressId as String?),
       actionSuccess: actionSuccess ?? this.actionSuccess,
-      actionError: actionError ?? this.actionError,
+      actionError: actionError == const Object()
+          ? this.actionError
+          : (actionError as String?),
     );
   }
 }
@@ -298,6 +302,7 @@ class WorkersBloc extends Bloc<WorkersEvent, WorkersState> {
     emit(state.copyWith(isAssistanceLoading: true, actionError: null));
     try {
       final depts = await _profileRepository.fetchDepartments();
+      print('DEBUG WorkersBloc: Loaded departments: ${depts.map((d) => "${d.name} (${d.id})").toList()}');
       // Load foremen list (ACTIVE status only)
       final (foremenList, _) = await _profileRepository.fetchUsers(role: 'FOREMAN', status: 'ACTIVE');
 

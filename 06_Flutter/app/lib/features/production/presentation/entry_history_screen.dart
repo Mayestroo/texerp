@@ -96,48 +96,61 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
         }
 
         if (state.historyError != null && state.history.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle_fill,
-                    color: AppColors.error,
-                    size: 44,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Tarixni yuklashda xatolik',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    state.historyError!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  CupertinoButton(
-                    color: AppColors.primary,
-                    onPressed: () {
-                      context.read<ProductionBloc>().add(const ProductionLoadHistoryRequested(refresh: true));
-                    },
-                    child: const Text('Qaytadan urinish'),
-                  ),
-                ],
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              CupertinoSliverRefreshControl(
+                onRefresh: () async {
+                  context.read<ProductionBloc>().add(const ProductionLoadHistoryRequested(refresh: true));
+                },
               ),
-            ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          color: AppColors.error,
+                          size: 44,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Tarixni yuklashda xatolik',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          state.historyError!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        CupertinoButton(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: () {
+                            context.read<ProductionBloc>().add(const ProductionLoadHistoryRequested(refresh: true));
+                          },
+                          child: const Text('Qaytadan urinish'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -207,19 +220,26 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                   (context, index) {
                     final entry = state.history[index];
                     final earning = entry.quantitySubmitted * entry.unitPriceSnapshot;
+                    final initials = entry.operationNameSnapshot
+                        .split(' ')
+                        .map((e) => e.isNotEmpty ? e[0] : '')
+                        .take(2)
+                        .join()
+                        .toUpperCase();
+                    final primaryColor = CupertinoTheme.of(context).primaryColor;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.cardDark : AppColors.cardLight,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000),
+                          color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: CupertinoColors.black.withOpacity(0.02),
+                            color: CupertinoColors.black.withOpacity(isDark ? 0.2 : 0.02),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -229,119 +249,173 @@ class _EntryHistoryScreenState extends State<EntryHistoryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
+                              // Initials avatar
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: primaryColor.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
                                 child: Text(
-                                  entry.operationNameSnapshot,
+                                  initials.isNotEmpty ? initials : "?",
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                    color: primaryColor,
                                     inherit: false,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      entry.operationNameSnapshot,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                        inherit: false,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _formatDate(entry.submittedAt),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                                        inherit: false,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),
                               _buildStatusBadge(entry.status, isDark),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Divider(
-                            color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000),
-                            height: 1,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Hajmi',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                                      inherit: false,
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hajmi',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                                        inherit: false,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${entry.quantitySubmitted.toInt()} dona',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
-                                      inherit: false,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${entry.quantitySubmitted.toInt()} dona',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                        inherit: false,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Taxminiy daromad',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                                      inherit: false,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${NumberFormat.decimalPattern().format(earning)} UZS',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.success,
-                                      inherit: false,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _formatDate(entry.submittedAt),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                                  inherit: false,
+                                  ],
                                 ),
-                              ),
-                              if (entry.workerNote != null && entry.workerNote!.isNotEmpty)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Taxminiy daromad',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                                        inherit: false,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${NumberFormat.decimalPattern().format(earning)} UZS',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.success,
+                                        inherit: false,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (entry.workerNote != null && entry.workerNote!.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
                                 Icon(
                                   CupertinoIcons.text_bubble,
-                                  size: 16,
-                                  color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                                  size: 13,
+                                  color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                 ),
-                            ],
-                          ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    entry.workerNote!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                      fontStyle: FontStyle.italic,
+                                      inherit: false,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (entry.status == 'REJECTED' && entry.rejectionReason != null && entry.rejectionReason!.isNotEmpty) ...[
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 color: AppColors.error.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.error.withOpacity(0.15)),
                               ),
-                              child: Text(
-                                'Rad sababi: ${entry.rejectionReason}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.error,
-                                  fontWeight: FontWeight.w500,
-                                  inherit: false,
-                                ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    CupertinoIcons.info_circle,
+                                    size: 14,
+                                    color: AppColors.error,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Rad etilish sababi: ${entry.rejectionReason}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.error,
+                                        fontWeight: FontWeight.w600,
+                                        inherit: false,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

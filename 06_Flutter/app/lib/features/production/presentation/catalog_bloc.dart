@@ -74,18 +74,22 @@ class CatalogState {
     bool? isLoading,
     String? error,
     String? status,
-    String? actionInProgressId,
+    Object? actionInProgressId = const Object(),
     bool? actionSuccess,
-    String? actionError,
+    Object? actionError = const Object(),
   }) {
     return CatalogState(
       operations: operations ?? this.operations,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       status: status ?? this.status,
-      actionInProgressId: actionInProgressId ?? this.actionInProgressId,
+      actionInProgressId: actionInProgressId == const Object()
+          ? this.actionInProgressId
+          : (actionInProgressId as String?),
       actionSuccess: actionSuccess ?? this.actionSuccess,
-      actionError: actionError ?? this.actionError,
+      actionError: actionError == const Object()
+          ? this.actionError
+          : (actionError as String?),
     );
   }
 }

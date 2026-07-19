@@ -89,6 +89,7 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
       context: context,
       builder: (BuildContext context) {
         final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+        final primaryColor = CupertinoTheme.of(context).primaryColor;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -103,23 +104,38 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
             }
 
             return Container(
-              height: MediaQuery.of(context).size.height * 0.55,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              height: MediaQuery.of(context).size.height * 0.65,
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
               decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground.resolveFrom(context),
+                color: isDark ? const Color(0xFF1C1C1E) : CupertinoColors.systemBackground.resolveFrom(context),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
                 ),
               ),
               child: SafeArea(
-                top: false,
+                bottom: false,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 5,
+                        margin: const EdgeInsets.only(top: 8, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFC7C7CC),
+                          borderRadius: BorderRadius.circular(2.5),
+                        ),
+                      ),
+                    ),
                     // Header
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -134,127 +150,182 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                           ),
                           CupertinoButton(
                             padding: EdgeInsets.zero,
-                            child: const Text('Bekor qilish'),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                CupertinoIcons.xmark,
+                                size: 16,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                              ),
+                            ),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Quantity adjustments
-                    Text(
-                      'Tahrirlangan hajm (dona)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                        fontWeight: FontWeight.w500,
-                        inherit: false,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          onPressed: () => adjustQty(-1),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0x11FFFFFF) : const Color(0x05000000),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(CupertinoIcons.minus, size: 20),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: CupertinoTextField(
-                              controller: quantityController,
-                              keyboardType: TextInputType.number,
-                              textAlign: TextAlign.center,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Quantity Label
+                            Text(
+                              'Tahrirlangan hajm (dona)',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                inherit: false,
                               ),
-                              decoration: const BoxDecoration(),
                             ),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          onPressed: () => adjustQty(1),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0x11FFFFFF) : const Color(0x05000000),
-                              shape: BoxShape.circle,
+                            const SizedBox(height: 12),
+                            // Quantity adjustments row
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => adjustQty(-1),
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(CupertinoIcons.minus, size: 18, color: isDark ? AppColors.labelDark : AppColors.labelLight),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: CupertinoTextField(
+                                      controller: quantityController,
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                      ),
+                                      decoration: const BoxDecoration(),
+                                    ),
+                                  ),
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    onPressed: () => adjustQty(1),
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(CupertinoIcons.plus, size: 18, color: isDark ? AppColors.labelDark : AppColors.labelLight),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: const Icon(CupertinoIcons.plus, size: 20),
-                          ),
+                            const SizedBox(height: 20),
+
+                            // Comment field Label
+                            Text(
+                              'Tahrirlash izohi (ixtiyoriy)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                fontWeight: FontWeight.bold,
+                                inherit: false,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+                                ),
+                              ),
+                              child: CupertinoTextField(
+                                controller: commentController,
+                                placeholder: 'Nima sababdan o\'zgartirildi...',
+                                placeholderStyle: TextStyle(
+                                  color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                                  fontSize: 14,
+                                ),
+                                style: TextStyle(
+                                  color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 3,
+                                decoration: const BoxDecoration(),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Submit button
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                final qty = double.tryParse(quantityController.text);
+                                if (qty == null || qty <= 0) {
+                                  AppToast.show(context, message: 'Hajmni to\'g\'ri kiriting', type: ToastType.error);
+                                  return;
+                                }
+                                Navigator.of(context).pop();
+                                this.context.read<ForemanQueueBloc>().add(
+                                      ForemanQueueCorrectRequested(
+                                        id: entry.id,
+                                        correctedQuantity: qty,
+                                        comment: commentController.text.trim(),
+                                      ),
+                                    );
+                              },
+                              child: Container(
+                                height: 50,
+                                width: double.infinity,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [primaryColor, primaryColor.withOpacity(0.8)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: primaryColor.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Text(
+                                  'Tahrirlab tasdiqlash',
+                                  style: TextStyle(
+                                    color: CupertinoColors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Comment field
-                    Text(
-                      'Tahrirlash izohi (ixtiyoriy)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                        fontWeight: FontWeight.w500,
-                        inherit: false,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    CupertinoTextField(
-                      controller: commentController,
-                      placeholder: 'Nima sababdan o\'zgartirildi...',
-                      maxLines: 2,
-                    ),
-                    const Spacer(),
-                    // Submit button
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        final qty = double.tryParse(quantityController.text);
-                        if (qty == null || qty <= 0) {
-                          AppToast.show(context, message: 'Hajmni to\'g\'ri kiriting', type: ToastType.error);
-                          return;
-                        }
-                        Navigator.of(context).pop();
-                        // Dispatch correct event
-                        this.context.read<ForemanQueueBloc>().add(
-                              ForemanQueueCorrectRequested(
-                                id: entry.id,
-                                correctedQuantity: qty,
-                                comment: commentController.text.trim(),
-                              ),
-                            );
-                      },
-                      child: Container(
-                        height: 52,
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Text(
-                          'Tahrirlab tasdiqlash',
-                          style: TextStyle(
-                            color: CupertinoColors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -274,6 +345,7 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
       listener: (context, state) {
         if (state.actionSuccess) {
           AppToast.show(context, message: 'Ish muvaffaqiyatli ko\'rib chiqildi!', type: ToastType.success);
+          context.read<ForemanQueueBloc>().add(const ForemanQueueLoadRequested());
         } else if (state.actionError != null) {
           AppToast.show(context, message: state.actionError!, type: ToastType.error);
         }
@@ -286,48 +358,61 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
         }
 
         if (state.error != null && state.pendingEntries.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle_fill,
-                    color: AppColors.error,
-                    size: 44,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Yuklashda xatolik',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.labelDark : AppColors.labelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    state.error!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                      inherit: false,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  CupertinoButton(
-                    color: AppColors.primary,
-                    onPressed: () {
-                      context.read<ForemanQueueBloc>().add(const ForemanQueueLoadRequested());
-                    },
-                    child: const Text('Qayta yuklash'),
-                  ),
-                ],
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              CupertinoSliverRefreshControl(
+                onRefresh: () async {
+                  context.read<ForemanQueueBloc>().add(const ForemanQueueLoadRequested());
+                },
               ),
-            ),
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.exclamationmark_triangle_fill,
+                          color: AppColors.error,
+                          size: 44,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Yuklashda xatolik',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          state.error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                            inherit: false,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        CupertinoButton(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: () {
+                            context.read<ForemanQueueBloc>().add(const ForemanQueueLoadRequested());
+                          },
+                          child: const Text('Qayta yuklash'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -398,6 +483,12 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                     final entry = state.pendingEntries[index];
                     final isBusy = state.actionInProgressId == entry.id;
                     final totalCost = entry.quantitySubmitted * entry.unitPriceSnapshot;
+                    final initials = entry.worker?.fullName
+                        .split(' ')
+                        .map((e) => e.isNotEmpty ? e[0] : '')
+                        .take(2)
+                        .join()
+                        .toUpperCase() ?? 'I';
 
                     return Opacity(
                       opacity: isBusy ? 0.6 : 1.0,
@@ -406,13 +497,13 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: isDark ? AppColors.cardDark : AppColors.cardLight,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000),
+                            color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: CupertinoColors.black.withOpacity(0.02),
+                              color: CupertinoColors.black.withOpacity(isDark ? 0.2 : 0.02),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -425,21 +516,20 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                             Row(
                               children: [
                                 Container(
-                                  width: 36,
-                                  height: 36,
+                                  width: 40,
+                                  height: 40,
                                   decoration: BoxDecoration(
                                     color: primaryColor.withOpacity(0.1),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      entry.worker?.fullName.substring(0, 1).toUpperCase() ?? 'I',
-                                      style: TextStyle(
-                                        color: primaryColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        inherit: false,
-                                      ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    initials,
+                                    style: TextStyle(
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      inherit: false,
                                     ),
                                   ),
                                 ),
@@ -458,13 +548,20 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 2),
-                                      Text(
-                                        entry.worker?.workerCode ?? '',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                                          inherit: false,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Icon(CupertinoIcons.number, size: 10, color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            entry.worker?.workerCode ?? '',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                              inherit: false,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -480,37 +577,56 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            Divider(color: isDark ? const Color(0x11FFFFFF) : const Color(0x11000000), height: 1),
+                            Divider(color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000), height: 1),
                             const SizedBox(height: 12),
-                            // Operation Details
+                            
+                            // Operation Details Title
                             Text(
                               entry.operationNameSnapshot,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                                 color: isDark ? AppColors.labelDark : AppColors.labelLight,
                                 inherit: false,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
+                            
+                            // Quantity and Price badges row
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'Hajmi: ${entry.quantitySubmitted.toInt()} dona',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                                    inherit: false,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    'Hajmi: ${entry.quantitySubmitted.toInt()} dona',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                      inherit: false,
+                                    ),
                                   ),
                                 ),
-                                Text(
-                                  '${NumberFormat.decimalPattern().format(totalCost)} UZS',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.success,
-                                    inherit: false,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppColors.success.withOpacity(0.15)),
+                                  ),
+                                  child: Text(
+                                    '${NumberFormat.decimalPattern().format(totalCost)} UZS',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.success,
+                                      inherit: false,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -521,17 +637,30 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: isDark ? const Color(0x0AFFFFFF) : const Color(0x05000000),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 width: double.infinity,
-                                child: Text(
-                                  'Ishchi izohi: ${entry.workerNote}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
-                                    fontStyle: FontStyle.italic,
-                                    inherit: false,
-                                  ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.text_bubble,
+                                      size: 14,
+                                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Ishchi izohi: ${entry.workerNote}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                                          fontStyle: FontStyle.italic,
+                                          inherit: false,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -545,7 +674,7 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                             else
                               Row(
                                 children: [
-                                  // Reject Button (Red)
+                                  // Reject Button
                                   Expanded(
                                     child: CupertinoButton(
                                       padding: EdgeInsets.zero,
@@ -554,23 +683,30 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                                         height: 40,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: AppColors.error.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                                          color: AppColors.error.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: AppColors.error.withOpacity(0.15)),
                                         ),
-                                        child: Text(
-                                          'Rad etish',
-                                          style: TextStyle(
-                                            color: AppColors.error,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(CupertinoIcons.xmark, size: 14, color: AppColors.error),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Rad etish',
+                                              style: TextStyle(
+                                                color: AppColors.error,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Edit Button (Blue)
+                                  // Edit Button
                                   Expanded(
                                     child: CupertinoButton(
                                       padding: EdgeInsets.zero,
@@ -579,23 +715,30 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                                         height: 40,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: AppColors.info.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppColors.info.withOpacity(0.2)),
+                                          color: AppColors.info.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: AppColors.info.withOpacity(0.15)),
                                         ),
-                                        child: Text(
-                                          'Tahrirlash',
-                                          style: TextStyle(
-                                            color: AppColors.info,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(CupertinoIcons.pencil, size: 14, color: AppColors.info),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Tahrirlash',
+                                              style: TextStyle(
+                                                color: AppColors.info,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Approve Button (Green)
+                                  // Approve Button
                                   Expanded(
                                     child: CupertinoButton(
                                       padding: EdgeInsets.zero,
@@ -608,17 +751,24 @@ class _ForemanQueueScreenState extends State<ForemanQueueScreen> {
                                         height: 40,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: AppColors.success.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: AppColors.success.withOpacity(0.2)),
+                                          color: AppColors.success.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: AppColors.success.withOpacity(0.15)),
                                         ),
-                                        child: Text(
-                                          'Tasdiqlash',
-                                          style: TextStyle(
-                                            color: AppColors.success,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                          ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(CupertinoIcons.checkmark, size: 14, color: AppColors.success),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Tasdiqlash',
+                                              style: TextStyle(
+                                                color: AppColors.success,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),

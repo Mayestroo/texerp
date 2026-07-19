@@ -134,9 +134,14 @@ class ProfileRepository {
   }
 
   /// Fetches departments.
-  Future<List<Department>> fetchDepartments() async {
+  Future<List<Department>> fetchDepartments({bool includeInactive = false}) async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>('/departments');
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/departments',
+        queryParameters: {
+          'include_inactive': includeInactive,
+        },
+      );
       final dataList = response.data!['data'] as List<dynamic>;
       return dataList
           .map((json) => Department.fromJson(json as Map<String, dynamic>))
