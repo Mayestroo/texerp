@@ -1,0 +1,104 @@
+name: TexERP Continuous Integration
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  backend-ci:
+    name: Backend CI (NestJS)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: texerp_test
+          POSTGRES_USER: texerp
+          POSTGRES_PASSWORD: texerp_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: app/backend
+        run: npm ci
+
+      - name: Run Linter
+        working-directory: app/backend
+        run: npm run lint
+
+      - name: Run Typecheck
+        working-directory: app/backend
+        run: npm run typecheck
+
+      - name: Run Unit Tests
+        working-directory: app/backend
+        run: npm run test
+
+      - name: Build Backend Application
+        working-directory: app/backend
+        run: npm run build
+
+      - name: Build Docker Image
+        working-directory: app/backend
+        run: docker build -t texerp-backend:ci .
+
+  flutter-ci:
+    name: Flutter Mobile CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter Dependencies
+        working-directory: app/flutter/app
+        run: flutter pub get
+
+      - name: Flutter Analyze
+        working-directory: app/flutter/app
+        run: flutter analyze
+
+      - name: Flutter Test
+        working-directory: app/flutter/app
+        run: flutter test

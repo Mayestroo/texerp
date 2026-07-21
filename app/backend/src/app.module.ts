@@ -24,6 +24,7 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { WorkersModule } from './workers/workers.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { EventsModule } from './shared/events/events.module';
+import { MonitoringModule } from './infrastructure/monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { EventsModule } from './shared/events/events.module';
     WorkersModule,
     PlatformModule,
     HealthModule,
+    MonitoringModule,
   ],
   providers: [
     {

@@ -16,7 +16,8 @@
     "test:e2e": "jest --config test/jest-e2e.json",
     "typecheck": "tsc --noEmit",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/infrastructure/database/data-source.ts",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/infrastructure/database/data-source.ts"
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/infrastructure/database/data-source.ts",
+    "seed:staging": "ts-node scripts/seed-staging.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1090.0",
@@ -40,6 +41,7 @@
     "ioredis": "^5.11.1",
     "joi": "^18.2.3",
     "pg": "^8.22.0",
+    "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "typeorm": "^1.1.0"

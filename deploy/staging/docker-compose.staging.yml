@@ -1,0 +1,117 @@
+name: texerp-staging
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: texerp-staging-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-texerp_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-texerp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staging_secure_password_123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+      - ../../app/backend/docker/postgres/init.sql:/docker-entrypoint-initdb.d/001-create-app-role.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-texerp} -d ${POSTGRES_DB:-texerp_staging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: texerp-staging-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../../app/backend
+      dockerfile: Dockerfile
+    container_name: texerp-staging-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: staging
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-texerp}:${POSTGRES_PASSWORD:-staging_secure_password_123}@postgres:5432/${POSTGRES_DB:-texerp_staging}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: staging_jwt_secret_key_change_in_prod_987654321
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: "*"
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: texerp-staging-prometheus
+    restart: always
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - staging_prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: texerp-staging-grafana
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin_staging_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - staging_grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: texerp-staging-loki
+    restart: always
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - staging_loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: texerp-staging-promtail
+    restart: always
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ../monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+
+volumes:
+  staging_postgres_data:
+  staging_redis_data:
+  staging_prometheus_data:
+  staging_grafana_data:
+  staging_loki_data:

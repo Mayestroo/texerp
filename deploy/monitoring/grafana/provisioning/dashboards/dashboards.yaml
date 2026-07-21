@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'TexERP Dashboards'
+    orgId: 1
+    folder: 'TexERP'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
