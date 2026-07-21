@@ -13,6 +13,8 @@ export const EventNames = {
   // Warehouse
   MATERIAL_RECEIVED: 'MaterialReceived',
   MATERIAL_ISSUED: 'MaterialIssued',
+  STOCK_CORRECTION_POSITIVE: 'StockCorrectionPositive',
+  STOCK_CORRECTION_NEGATIVE: 'StockCorrectionNegative',
   LOW_STOCK_ALERT: 'LowStockAlert',
   NEGATIVE_STOCK_WARNING: 'NegativeStockWarning',
 
@@ -21,6 +23,7 @@ export const EventNames = {
 
   // Platform
   TENANT_CREATED: 'TenantCreated',
+  TENANT_UPDATED: 'TenantUpdated',
   TENANT_SUSPENDED: 'TenantSuspended',
   TENANT_REACTIVATED: 'TenantReactivated',
   TENANT_TERMINATED: 'TenantTerminated',

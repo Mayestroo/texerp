@@ -48,7 +48,7 @@ export class WarehouseExceptionFilter
     if (exception instanceof InsufficientStockError) {
       this.send(
         response,
-        HttpStatus.CONFLICT,
+        HttpStatus.UNPROCESSABLE_ENTITY,
         'INSUFFICIENT_STOCK',
         'Omborda yetarli material mavjud emas',
         {

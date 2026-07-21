@@ -7,6 +7,8 @@ import { ListMaterialsQueryDto } from './dto/list-materials-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { MaterialCodeExistsError } from './errors/material-code-exists.error';
 import { MaterialNotFoundError } from './errors/material-not-found.error';
+import { stockBalanceSumCase } from './stock-balance.helper';
+import { StockMovementsService } from './stock-movements.service';
 
 export interface MaterialView {
   id: string;
@@ -37,9 +39,16 @@ interface MaterialRow {
   updated_at: Date;
 }
 
+interface MaterialListRow extends MaterialRow {
+  balance: number | string;
+}
+
 @Injectable()
 export class MaterialsService {
-  constructor(private readonly tenantDatabase: TenantDatabase) {}
+  constructor(
+    private readonly tenantDatabase: TenantDatabase,
+    private readonly stockMovementsService: StockMovementsService,
+  ) {}
 
   async create(
     tenantId: string,
@@ -55,6 +64,18 @@ export class MaterialsService {
           `SELECT clock_timestamp() AS ts`,
         );
         const timestamp = timestampResult[0].ts;
+
+        const afterState = {
+          id: materialId,
+          code: dto.code.trim(),
+          name: dto.name.trim(),
+          category: dto.category?.trim() ?? null,
+          unit: dto.unit,
+          min_quantity: dto.min_quantity ?? null,
+          is_active: true,
+        };
+
+        await this.insertAudit(manager, tenantId, materialId, 'MATERIAL_CREATED', actorId, null, afterState);
 
         await manager.query(
           `INSERT INTO materials
@@ -75,14 +96,8 @@ export class MaterialsService {
         );
 
         return {
-          id: materialId,
+          ...afterState,
           tenant_id: tenantId,
-          code: dto.code.trim(),
-          name: dto.name.trim(),
-          category: dto.category?.trim() ?? null,
-          unit: dto.unit,
-          min_quantity: dto.min_quantity ?? null,
-          is_active: true,
           balance: 0,
           created_by: actorId,
           created_at: timestamp,
@@ -132,22 +147,30 @@ export class MaterialsService {
 
       const limitIndex = paramIndex++;
       const offsetIndex = paramIndex;
-      const materials = await manager.query<MaterialRow[]>(
+      const materials = await manager.query<MaterialListRow[]>(
         `SELECT m.id, m.tenant_id, m.code, m.name, m.category, m.unit,
-                m.min_quantity, m.is_active, m.created_by, m.created_at, m.updated_at
+                m.min_quantity, m.is_active, m.created_by, m.created_at, m.updated_at,
+                COALESCE(b.balance, 0) AS balance
          FROM materials m
+         LEFT JOIN (
+           SELECT material_id, ${stockBalanceSumCase.trim()} AS balance
+           FROM stock_movements
+           WHERE tenant_id = $1
+           GROUP BY material_id
+         ) b ON b.material_id = m.id
          WHERE ${whereClause}
          ORDER BY m.created_at DESC
          LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
         [...params, query.limit, query.offset],
       );
 
-      const data = await Promise.all(
-        materials.map(async (material) => ({
-          ...material,
-          balance: await this.computeBalance(manager, tenantId, material.id),
-        })),
-      );
+      const data = materials.map((material) => ({
+        ...material,
+        balance:
+          typeof material.balance === 'string'
+            ? Number.parseFloat(material.balance)
+            : Number(material.balance),
+      }));
 
       return { data, total };
     });
@@ -156,18 +179,19 @@ export class MaterialsService {
   async get(tenantId: string, materialId: string): Promise<MaterialView> {
     return this.tenantDatabase.withTenant(tenantId, async (manager) => {
       const material = await this.requireMaterial(manager, tenantId, materialId);
-      const balance = await this.computeBalance(manager, tenantId, materialId);
+      const balance = await this.stockMovementsService.computeBalance(materialId, manager);
       return { ...material, balance };
     });
   }
 
   async update(
     tenantId: string,
+    actorId: string,
     materialId: string,
     dto: UpdateMaterialDto,
   ): Promise<MaterialView> {
     return this.tenantDatabase.withTenant(tenantId, async (manager) => {
-      await this.requireMaterial(manager, tenantId, materialId);
+      const material = await this.requireMaterial(manager, tenantId, materialId);
 
       const sets: string[] = [];
       const values: unknown[] = [];
@@ -187,16 +211,28 @@ export class MaterialsService {
       }
 
       if (sets.length === 0) {
-        const material = await this.requireMaterial(
-          manager,
-          tenantId,
-          materialId,
-        );
-        return {
-          ...material,
-          balance: await this.computeBalance(manager, tenantId, materialId),
-        };
+        const balance = await this.stockMovementsService.computeBalance(materialId, manager);
+        return { ...material, balance };
       }
+
+      const beforeState = {
+        name: material.name,
+        category: material.category,
+        min_quantity: material.min_quantity,
+      };
+      const afterState = {
+        name: dto.name !== undefined ? dto.name.trim() : material.name,
+        category:
+          dto.category !== undefined
+            ? dto.category?.trim() ?? null
+            : material.category,
+        min_quantity:
+          dto.min_quantity !== undefined
+            ? dto.min_quantity
+            : material.min_quantity,
+      };
+
+      await this.insertAudit(manager, tenantId, materialId, 'MATERIAL_UPDATED', actorId, beforeState, afterState);
 
       sets.push(`updated_at = now()`);
       values.push(tenantId);
@@ -208,24 +244,26 @@ export class MaterialsService {
         values,
       );
 
-      const material = await this.requireMaterial(
-        manager,
-        tenantId,
-        materialId,
-      );
-      return {
-        ...material,
-        balance: await this.computeBalance(manager, tenantId, materialId),
-      };
+      const updated = await this.requireMaterial(manager, tenantId, materialId);
+      const balance = await this.stockMovementsService.computeBalance(materialId, manager);
+      return { ...updated, balance };
     });
   }
 
-  async deactivate(tenantId: string, materialId: string): Promise<MaterialView> {
-    return this.setActive(tenantId, materialId, false);
+  async deactivate(
+    tenantId: string,
+    actorId: string,
+    materialId: string,
+  ): Promise<MaterialView> {
+    return this.setActive(tenantId, actorId, materialId, false);
   }
 
-  async activate(tenantId: string, materialId: string): Promise<MaterialView> {
-    return this.setActive(tenantId, materialId, true);
+  async activate(
+    tenantId: string,
+    actorId: string,
+    materialId: string,
+  ): Promise<MaterialView> {
+    return this.setActive(tenantId, actorId, materialId, true);
   }
 
   async getBalance(
@@ -234,7 +272,7 @@ export class MaterialsService {
   ): Promise<{ material_id: string; balance: number }> {
     return this.tenantDatabase.withTenant(tenantId, async (manager) => {
       await this.requireMaterial(manager, tenantId, materialId);
-      const balance = await this.computeBalance(manager, tenantId, materialId);
+      const balance = await this.stockMovementsService.computeBalance(materialId, manager);
       return { material_id: materialId, balance };
     });
   }
@@ -259,32 +297,20 @@ export class MaterialsService {
     return material;
   }
 
-  async computeBalance(
-    manager: EntityManager,
-    tenantId: string,
-    materialId: string,
-  ): Promise<number> {
-    const result = await manager.query<{ balance: number | string }[]>(
-      `SELECT COALESCE(SUM(
-         CASE WHEN type IN ('RECEIPT', 'CORRECTION_POSITIVE') THEN quantity
-              WHEN type IN ('ISSUANCE', 'CORRECTION_NEGATIVE') THEN -quantity
-         END
-       ), 0) AS balance
-       FROM stock_movements
-       WHERE tenant_id = $1 AND material_id = $2`,
-      [tenantId, materialId],
-    );
-    const raw = result[0]?.balance ?? 0;
-    return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
-  }
-
   private async setActive(
     tenantId: string,
+    actorId: string,
     materialId: string,
     isActive: boolean,
   ): Promise<MaterialView> {
     return this.tenantDatabase.withTenant(tenantId, async (manager) => {
-      await this.requireMaterial(manager, tenantId, materialId);
+      const material = await this.requireMaterial(manager, tenantId, materialId);
+
+      const beforeState = { is_active: material.is_active };
+      const afterState = { is_active: isActive };
+      const action = isActive ? 'MATERIAL_REACTIVATED' : 'MATERIAL_DEACTIVATED';
+
+      await this.insertAudit(manager, tenantId, materialId, action, actorId, beforeState, afterState);
 
       await manager.query(
         `UPDATE materials
@@ -293,16 +319,41 @@ export class MaterialsService {
         [tenantId, materialId, isActive],
       );
 
-      const material = await this.requireMaterial(
-        manager,
-        tenantId,
-        materialId,
-      );
-      return {
-        ...material,
-        balance: await this.computeBalance(manager, tenantId, materialId),
-      };
+      const updated = await this.requireMaterial(manager, tenantId, materialId);
+      const balance = await this.stockMovementsService.computeBalance(materialId, manager);
+      return { ...updated, balance };
     });
+  }
+
+  private async insertAudit(
+    manager: EntityManager,
+    tenantId: string,
+    materialId: string,
+    action: 'MATERIAL_CREATED' | 'MATERIAL_UPDATED' | 'MATERIAL_DEACTIVATED' | 'MATERIAL_REACTIVATED',
+    actorId: string,
+    beforeState: Record<string, unknown> | null,
+    afterState: Record<string, unknown>,
+  ): Promise<void> {
+    if (beforeState === null) {
+      await manager.query(
+        `INSERT INTO audit_events
+           (id, tenant_id, aggregate_type, aggregate_id, action, actor_id, actor_role,
+            after_state, ip_address, user_agent)
+         VALUES ($1, $2, 'MATERIAL', $3, $4, $5, 'DIRECTOR',
+            $6::jsonb, $7, $8)`,
+        [uuidv7(), tenantId, materialId, action, actorId, JSON.stringify(afterState), null, null],
+      );
+      return;
+    }
+
+    await manager.query(
+      `INSERT INTO audit_events
+         (id, tenant_id, aggregate_type, aggregate_id, action, actor_id, actor_role,
+          before_state, after_state, ip_address, user_agent)
+       VALUES ($1, $2, 'MATERIAL', $3, $4, $5, 'DIRECTOR',
+          $6::jsonb, $7::jsonb, $8, $9)`,
+      [uuidv7(), tenantId, materialId, action, actorId, JSON.stringify(beforeState), JSON.stringify(afterState), null, null],
+    );
   }
 
   private async assertCodeAvailable(

@@ -9,7 +9,9 @@ import { RecordCorrectionDto } from './dto/record-correction.dto';
 import { RecordIssuanceDto } from './dto/record-issuance.dto';
 import { RecordReceiptDto } from './dto/record-receipt.dto';
 import { InsufficientStockError } from './errors/insufficient-stock.error';
+import { MaterialInactiveError } from './errors/material-inactive.error';
 import { MaterialNotFoundError } from './errors/material-not-found.error';
+import { stockBalanceSumCase } from './stock-balance.helper';
 
 export type StockMovementType =
   | 'RECEIPT'
@@ -55,6 +57,32 @@ export class StockMovementsService {
         tenantId,
         materialId,
       );
+      const balanceBefore = await this.computeBalance(materialId, manager);
+      const newBalance = balanceBefore + dto.quantity;
+
+      const movementId = uuidv7();
+      const timestampResult = await manager.query<{ ts: Date }[]>(
+        `SELECT clock_timestamp() AS ts`,
+      );
+      const timestamp = timestampResult[0].ts;
+
+      await this.insertMovementAudit(
+        manager,
+        tenantId,
+        movementId,
+        'STOCK_RECEIPT_RECORDED',
+        actorId,
+        { balance: balanceBefore },
+        {
+          type: 'RECEIPT',
+          material_id: materialId,
+          quantity: dto.quantity,
+          supplier_name: dto.supplier_name ?? null,
+          movement_date: dto.movement_date,
+          new_balance: newBalance,
+        },
+      );
+
       const movement = await this.insertMovement(
         manager,
         tenantId,
@@ -69,6 +97,8 @@ export class StockMovementsService {
           note: dto.note,
           photo_urls: dto.photo_urls,
         },
+        movementId,
+        timestamp,
       );
 
       this.eventPublisher.publish(
@@ -105,15 +135,41 @@ export class StockMovementsService {
         tenantId,
         materialId,
       );
-      const balance = await this.computeBalance(manager, tenantId, materialId);
+      const balanceBefore = await this.computeBalance(materialId, manager);
       const config = await this.tenantConfigService.get(tenantId);
-      const wouldGoNegative = balance < dto.quantity;
+      const wouldGoNegative = balanceBefore < dto.quantity;
 
       if (wouldGoNegative && config.stock_negative_mode === 'HARD_BLOCK') {
-        throw new InsufficientStockError(materialId, dto.quantity, balance);
+        throw new InsufficientStockError(materialId, dto.quantity, balanceBefore);
       }
 
-      const isFlagged = wouldGoNegative && config.stock_negative_mode === 'WARNING';
+      const isFlagged =
+        wouldGoNegative && config.stock_negative_mode === 'WARNING';
+      const newBalance = balanceBefore - dto.quantity;
+
+      const movementId = uuidv7();
+      const timestampResult = await manager.query<{ ts: Date }[]>(
+        `SELECT clock_timestamp() AS ts`,
+      );
+      const timestamp = timestampResult[0].ts;
+
+      await this.insertMovementAudit(
+        manager,
+        tenantId,
+        movementId,
+        'STOCK_ISSUANCE_RECORDED',
+        actorId,
+        { balance: balanceBefore },
+        {
+          type: 'ISSUANCE',
+          material_id: materialId,
+          quantity: dto.quantity,
+          destination: dto.destination ?? null,
+          movement_date: dto.movement_date,
+          new_balance: newBalance,
+          is_flagged: isFlagged,
+        },
+      );
 
       const movement = await this.insertMovement(
         manager,
@@ -129,6 +185,8 @@ export class StockMovementsService {
           note: dto.note,
           is_flagged: isFlagged,
         },
+        movementId,
+        timestamp,
       );
 
       this.eventPublisher.publish(
@@ -160,8 +218,8 @@ export class StockMovementsService {
             material_id: materialId,
             material_code: material.code,
             requested: dto.quantity,
-            available_before: balance,
-            new_balance: balance - dto.quantity,
+            available_before: balanceBefore,
+            new_balance: newBalance,
           },
         );
       }
@@ -184,18 +242,57 @@ export class StockMovementsService {
         tenantId,
         materialId,
       );
-      const balance = await this.computeBalance(manager, tenantId, materialId);
+      const balanceBefore = await this.computeBalance(materialId, manager);
       const type: StockMovementType =
         dto.correction_type === 'POSITIVE'
           ? 'CORRECTION_POSITIVE'
           : 'CORRECTION_NEGATIVE';
+      const isNegative = type === 'CORRECTION_NEGATIVE';
+      const newBalance = isNegative
+        ? balanceBefore - dto.quantity
+        : balanceBefore + dto.quantity;
 
-      if (type === 'CORRECTION_NEGATIVE' && balance < dto.quantity) {
+      if (isNegative && balanceBefore < dto.quantity) {
         const config = await this.tenantConfigService.get(tenantId);
         if (config.stock_negative_mode === 'HARD_BLOCK') {
-          throw new InsufficientStockError(materialId, dto.quantity, balance);
+          throw new InsufficientStockError(
+            materialId,
+            dto.quantity,
+            balanceBefore,
+          );
         }
       }
+
+      const config = await this.tenantConfigService.get(tenantId);
+      const isFlagged =
+        isNegative &&
+        config.stock_negative_mode === 'WARNING' &&
+        newBalance < 0;
+
+      const movementId = uuidv7();
+      const timestampResult = await manager.query<{ ts: Date }[]>(
+        `SELECT clock_timestamp() AS ts`,
+      );
+      const timestamp = timestampResult[0].ts;
+
+      await this.insertMovementAudit(
+        manager,
+        tenantId,
+        movementId,
+        'STOCK_CORRECTION_RECORDED',
+        actorId,
+        { balance: balanceBefore },
+        {
+          type,
+          material_id: materialId,
+          correction_type: dto.correction_type,
+          quantity: dto.quantity,
+          correction_reason: dto.correction_reason,
+          movement_date: dto.movement_date,
+          new_balance: newBalance,
+          is_flagged: isFlagged,
+        },
+      );
 
       const movement = await this.insertMovement(
         manager,
@@ -209,13 +306,16 @@ export class StockMovementsService {
           movement_date: dto.movement_date,
           note: dto.note,
           correction_reason: dto.correction_reason,
+          is_flagged: isFlagged,
         },
+        movementId,
+        timestamp,
       );
 
       this.eventPublisher.publish(
         type === 'CORRECTION_POSITIVE'
-          ? EventNames.MATERIAL_RECEIVED
-          : EventNames.MATERIAL_ISSUED,
+          ? EventNames.STOCK_CORRECTION_POSITIVE
+          : EventNames.STOCK_CORRECTION_NEGATIVE,
         'StockMovement',
         movement.id,
         tenantId,
@@ -228,8 +328,28 @@ export class StockMovementsService {
           quantity: dto.quantity,
           correction_reason: dto.correction_reason,
           movement_date: dto.movement_date,
+          is_flagged: isFlagged,
         },
       );
+
+      if (isFlagged) {
+        this.eventPublisher.publish(
+          EventNames.NEGATIVE_STOCK_WARNING,
+          'StockMovement',
+          movement.id,
+          tenantId,
+          actorId,
+          'DIRECTOR',
+          {
+            material_id: materialId,
+            material_code: material.code,
+            correction_type: dto.correction_type,
+            quantity: dto.quantity,
+            available_before: balanceBefore,
+            new_balance: newBalance,
+          },
+        );
+      }
 
       await this.maybePublishLowStock(manager, tenantId, actorId, material);
 
@@ -267,33 +387,49 @@ export class StockMovementsService {
   }
 
   async computeBalance(
-    manager: EntityManager,
-    tenantId: string,
     materialId: string,
+    manager: EntityManager,
   ): Promise<number> {
+    const tenantId = this.getTenantId(manager);
     const result = await manager.query<{ balance: number | string }[]>(
-      `SELECT COALESCE(SUM(
-         CASE WHEN type IN ('RECEIPT', 'CORRECTION_POSITIVE') THEN quantity
-              WHEN type IN ('ISSUANCE', 'CORRECTION_NEGATIVE') THEN -quantity
-         END
-       ), 0) AS balance
-       FROM stock_movements
-       WHERE tenant_id = $1 AND material_id = $2`,
+      `SELECT COALESCE(${stockBalanceSumCase.trim()}, 0) AS balance
+         FROM stock_movements
+        WHERE tenant_id = $1 AND material_id = $2`,
       [tenantId, materialId],
     );
     const raw = result[0]?.balance ?? 0;
     return typeof raw === 'string' ? Number.parseFloat(raw) : Number(raw);
   }
 
+  private getTenantId(manager: EntityManager): string {
+    const raw = (manager.queryRunner?.data as { tenantId?: unknown } | undefined)
+      ?.tenantId;
+    if (typeof raw === 'string') {
+      return raw;
+    }
+    throw new Error('Tenant context is missing from EntityManager');
+  }
+
   private async lockMaterialOrFail(
     manager: EntityManager,
     tenantId: string,
     materialId: string,
-  ): Promise<{ id: string; code: string; unit: string; min_quantity: number | null }> {
+  ): Promise<{
+    id: string;
+    code: string;
+    unit: string;
+    min_quantity: number | null;
+  }> {
     const rows = await manager.query<
-      { id: string; code: string; unit: string; min_quantity: number | null }[]
+      {
+        id: string;
+        code: string;
+        unit: string;
+        min_quantity: number | null;
+        is_active: boolean;
+      }[]
     >(
-      `SELECT id, code, unit, min_quantity
+      `SELECT id, code, unit, min_quantity, is_active
        FROM materials
        WHERE tenant_id = $1 AND id = $2
        FOR UPDATE`,
@@ -302,6 +438,9 @@ export class StockMovementsService {
     const material = rows[0];
     if (!material) {
       throw new MaterialNotFoundError(materialId);
+    }
+    if (!material.is_active) {
+      throw new MaterialInactiveError(materialId);
     }
     return material;
   }
@@ -323,13 +462,9 @@ export class StockMovementsService {
       correction_reason?: string;
       is_flagged?: boolean;
     },
+    movementId: string,
+    timestamp: Date,
   ): Promise<StockMovementView> {
-    const movementId = uuidv7();
-    const timestampResult = await manager.query<{ ts: Date }[]>(
-      `SELECT clock_timestamp() AS ts`,
-    );
-    const timestamp = timestampResult[0].ts;
-
     await manager.query(
       `INSERT INTO stock_movements
          (id, tenant_id, material_id, type, quantity, unit_snapshot,
@@ -375,6 +510,38 @@ export class StockMovementsService {
     };
   }
 
+  private async insertMovementAudit(
+    manager: EntityManager,
+    tenantId: string,
+    movementId: string,
+    action:
+      | 'STOCK_RECEIPT_RECORDED'
+      | 'STOCK_ISSUANCE_RECORDED'
+      | 'STOCK_CORRECTION_RECORDED',
+    actorId: string,
+    beforeState: Record<string, unknown>,
+    afterState: Record<string, unknown>,
+  ): Promise<void> {
+    await manager.query(
+      `INSERT INTO audit_events
+         (id, tenant_id, aggregate_type, aggregate_id, action, actor_id, actor_role,
+          before_state, after_state, ip_address, user_agent)
+       VALUES ($1, $2, 'STOCK_MOVEMENT', $3, $4, $5, 'DIRECTOR',
+          $6::jsonb, $7::jsonb, $8, $9)`,
+      [
+        uuidv7(),
+        tenantId,
+        movementId,
+        action,
+        actorId,
+        JSON.stringify(beforeState),
+        JSON.stringify(afterState),
+        null,
+        null,
+      ],
+    );
+  }
+
   private async maybePublishLowStock(
     manager: EntityManager,
     tenantId: string,
@@ -385,7 +552,7 @@ export class StockMovementsService {
       return;
     }
 
-    const balance = await this.computeBalance(manager, tenantId, material.id);
+    const balance = await this.computeBalance(material.id, manager);
     if (balance < material.min_quantity) {
       this.eventPublisher.publish(
         EventNames.LOW_STOCK_ALERT,
