@@ -174,4 +174,7 @@ class AppLocalizationsUz extends AppLocalizations {
 
   @override
   String get noNetwork => 'Tarmoq aloqasi yo\'q';
+
+  @override
+  String get settings => 'Sozlamalar';
 }

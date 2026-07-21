@@ -2,12 +2,18 @@ import 'package:dio/dio.dart';
 
 import 'package:texerp/core/error/network_exception.dart';
 import 'package:texerp/core/network/api_client.dart';
+import 'package:texerp/core/sync/offline_queue.dart';
 import 'package:texerp/features/production/data/production_models.dart';
 
 class ProductionRepository {
-  ProductionRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  ProductionRepository({
+    required ApiClient apiClient,
+    OfflineQueue? offlineQueue,
+  })  : _apiClient = apiClient,
+        _offlineQueue = offlineQueue ?? OfflineQueue();
 
   final ApiClient _apiClient;
+  final OfflineQueue _offlineQueue;
 
   /// Fetches operations. By default fetches active ones.
   Future<List<Operation>> fetchOperations({
@@ -114,7 +120,8 @@ class ProductionRepository {
         '/production/entries',
         data: {
           'operation_id': operationId,
-          'quantity': quantity.toInt(), // The backend expects an integer for quantity (@IsInt())
+          'quantity': quantity
+              .toInt(), // The backend expects an integer for quantity (@IsInt())
           'record_date': recordDate,
           if (workerNote != null && workerNote.isNotEmpty)
             'worker_note': workerNote,
@@ -125,6 +132,30 @@ class ProductionRepository {
     } on DioException catch (e) {
       throw _mapDioError(e);
     }
+  }
+
+  /// Queues a production entry to be synced when the device is back online.
+  Future<void> submitEntryOffline({
+    required String operationId,
+    required int quantity,
+    required String recordDate,
+    String? workerNote,
+  }) async {
+    if (quantity < 1 || quantity > 9999) {
+      throw Exception('Quantity must be between 1 and 9999');
+    }
+    await _offlineQueue.enqueue(
+      entityType: 'production_entry',
+      operation: 'CREATE',
+      payload: {
+        'operation_id': operationId,
+        'quantity': quantity,
+        'record_date': recordDate,
+        if (workerNote != null && workerNote.isNotEmpty)
+          'worker_note': workerNote,
+        'offline_created_at': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
   /// Fetches the authenticated worker's production entries.
@@ -295,6 +326,22 @@ class ProductionRepository {
     }
   }
 
+  /// Bulk approves multiple pending entries (up to 50 items).
+  Future<int> bulkApproveEntries(List<String> ids) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/production/entries/bulk-approve',
+        data: {
+          'entry_ids': ids,
+        },
+      );
+      final approvedCount = response.data!['data']?['approved_count'] as int? ?? ids.length;
+      return approvedCount;
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   NetworkException _mapDioError(DioException e) {
     final response = e.response;
     if (response != null) {
@@ -302,15 +349,18 @@ class ProductionRepository {
       if (data is Map<String, dynamic>) {
         final error = data['error'] as Map<String, dynamic>?;
         final code = error?['code'] as String? ?? 'UNKNOWN_ERROR';
-        final message = error?['message'] as String? ?? e.message ?? 'Unknown error';
+        final message =
+            error?['message'] as String? ?? e.message ?? 'Unknown error';
         return NetworkException(code: code, message: message);
       }
     }
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
-      return const NetworkException(code: 'NETWORK_ERROR', message: 'No internet connection');
+      return const NetworkException(
+          code: 'NETWORK_ERROR', message: 'No internet connection');
     }
-    return NetworkException(code: 'UNKNOWN_ERROR', message: e.message ?? 'Unknown error');
+    return NetworkException(
+        code: 'UNKNOWN_ERROR', message: e.message ?? 'Unknown error');
   }
 }

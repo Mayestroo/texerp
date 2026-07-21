@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -30,5 +31,6 @@ export class CreateMaterialDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(99999999999.999)
   min_quantity?: number;
 }

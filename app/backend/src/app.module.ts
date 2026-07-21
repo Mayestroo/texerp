@@ -22,6 +22,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { WorkersModule } from './workers/workers.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { EventsModule } from './shared/events/events.module';
 
 @Module({
@@ -60,6 +61,7 @@ import { EventsModule } from './shared/events/events.module';
     SettingsModule,
     WarehouseModule,
     WorkersModule,
+    PlatformModule,
     HealthModule,
   ],
   providers: [

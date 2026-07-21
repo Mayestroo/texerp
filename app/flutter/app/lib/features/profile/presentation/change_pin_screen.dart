@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:texerp/core/error/network_exception.dart';
 import 'package:texerp/features/auth/data/auth_repository.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:texerp/generated/app_localizations.dart';
 import 'package:texerp/core/theme/app_theme.dart';
 import 'package:texerp/core/widgets/num_pad.dart';
 import 'package:texerp/core/widgets/pin_dots.dart';

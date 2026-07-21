@@ -1,24 +1,36 @@
 import 'dart:ui';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:texerp/core/l10n/locale_cubit.dart';
 import 'package:texerp/core/network/api_client.dart';
+import 'package:texerp/core/network/connectivity_cubit.dart';
+import 'package:texerp/core/network/network_info.dart';
 import 'package:texerp/core/network/token_provider.dart';
+import 'package:texerp/core/notifications/fcm_service.dart';
 import 'package:texerp/core/router/app_router.dart';
 import 'package:texerp/core/storage/secure_storage.dart';
+import 'package:texerp/core/sync/auto_sync_manager.dart';
+import 'package:texerp/core/sync/conflict_resolver.dart';
+import 'package:texerp/core/sync/offline_queue.dart';
+import 'package:texerp/core/sync/sync_manager.dart';
 import 'package:texerp/core/theme/app_theme.dart';
 import 'package:texerp/features/auth/data/auth_repository.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
+import 'package:texerp/features/notifications/data/notifications_repository.dart';
 import 'package:texerp/features/profile/data/profile_repository.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:texerp/features/production/data/production_repository.dart';
 import 'package:texerp/features/payroll/data/payroll_repository.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:texerp/features/reports/data/reports_repository.dart';
+import 'package:texerp/features/settings/data/settings_repository.dart';
+import 'package:texerp/features/warehouse/data/warehouse_repository.dart';
+import 'package:texerp/generated/app_localizations.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final secureStorage = SecureStorage();
@@ -32,6 +44,25 @@ void main() {
     localeCubit: localeCubit,
   );
 
+  final fcmService = FcmService(apiClient: apiClient);
+  await fcmService.initialize();
+
+  final networkInfo = NetworkInfo(Connectivity());
+  final connectivityCubit = ConnectivityCubit(networkInfo);
+
+  final offlineQueue = OfflineQueue();
+  final conflictResolver = ConflictResolver();
+  final syncManager = SyncManager(
+    apiClient: apiClient,
+    offlineQueue: offlineQueue,
+    conflictResolver: conflictResolver,
+  );
+  final autoSyncManager = AutoSyncManager(
+    networkInfo: networkInfo,
+    syncManager: syncManager,
+  );
+  autoSyncManager.start();
+
   final authRepository = AuthRepository(
     apiClient: apiClient,
     secureStorage: secureStorage,
@@ -41,6 +72,7 @@ void main() {
     authRepository: authRepository,
     secureStorage: secureStorage,
     tokenProvider: tokenProvider,
+    fcmService: fcmService,
   );
 
   apiClient.onSessionExpired = () => authBloc.add(const AuthSessionExpired());
@@ -51,6 +83,10 @@ void main() {
   final profileRepository = ProfileRepository(apiClient: apiClient);
   final productionRepository = ProductionRepository(apiClient: apiClient);
   final payrollRepository = PayrollRepository(apiClient: apiClient);
+  final notificationsRepository = NotificationsRepository(apiClient: apiClient);
+  final reportsRepository = ReportsRepository(apiClient: apiClient);
+  final settingsRepository = SettingsRepository(apiClient: apiClient);
+  final warehouseRepository = WarehouseRepository(apiClient: apiClient);
 
   final profileBloc = ProfileBloc(
     profileRepository: profileRepository,
@@ -58,7 +94,10 @@ void main() {
     onLogout: () => authBloc.add(const AuthLogoutRequested()),
   );
 
-  final appRouter = AppRouter(authBloc: authBloc);
+  final appRouter = AppRouter(
+    authBloc: authBloc,
+    fcmService: fcmService,
+  );
 
   runApp(
     TexERPApp(
@@ -70,7 +109,15 @@ void main() {
       profileRepository: profileRepository,
       productionRepository: productionRepository,
       payrollRepository: payrollRepository,
+      reportsRepository: reportsRepository,
+      settingsRepository: settingsRepository,
+      warehouseRepository: warehouseRepository,
+      notificationsRepository: notificationsRepository,
       secureStorage: secureStorage,
+      fcmService: fcmService,
+      connectivityCubit: connectivityCubit,
+      syncManager: syncManager,
+      autoSyncManager: autoSyncManager,
     ),
   );
 }
@@ -85,7 +132,15 @@ class TexERPApp extends StatelessWidget {
     required this.profileRepository,
     required this.productionRepository,
     required this.payrollRepository,
+    required this.reportsRepository,
+    required this.settingsRepository,
+    required this.warehouseRepository,
+    required this.notificationsRepository,
     required this.secureStorage,
+    required this.fcmService,
+    required this.connectivityCubit,
+    required this.syncManager,
+    required this.autoSyncManager,
     super.key,
   });
 
@@ -97,7 +152,15 @@ class TexERPApp extends StatelessWidget {
   final ProfileRepository profileRepository;
   final ProductionRepository productionRepository;
   final PayrollRepository payrollRepository;
+  final ReportsRepository reportsRepository;
+  final SettingsRepository settingsRepository;
+  final WarehouseRepository warehouseRepository;
+  final NotificationsRepository notificationsRepository;
   final SecureStorage secureStorage;
+  final FcmService fcmService;
+  final ConnectivityCubit connectivityCubit;
+  final SyncManager syncManager;
+  final AutoSyncManager autoSyncManager;
 
   @override
   Widget build(BuildContext context) {
@@ -107,13 +170,20 @@ class TexERPApp extends StatelessWidget {
         RepositoryProvider.value(value: profileRepository),
         RepositoryProvider.value(value: productionRepository),
         RepositoryProvider.value(value: payrollRepository),
+        RepositoryProvider.value(value: reportsRepository),
+        RepositoryProvider.value(value: settingsRepository),
+        RepositoryProvider.value(value: warehouseRepository),
+        RepositoryProvider.value(value: notificationsRepository),
         RepositoryProvider.value(value: secureStorage),
+        RepositoryProvider.value(value: fcmService),
+        RepositoryProvider.value(value: syncManager),
       ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider.value(value: authBloc),
           BlocProvider.value(value: profileBloc),
           BlocProvider.value(value: localeCubit),
+          BlocProvider.value(value: connectivityCubit),
         ],
         child: BlocBuilder<LocaleCubit, Locale>(
           builder: (context, locale) {

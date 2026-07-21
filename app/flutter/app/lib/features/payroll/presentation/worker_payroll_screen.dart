@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:texerp/core/theme/app_theme.dart';
@@ -104,7 +105,11 @@ class _WorkerPayrollScreenState extends State<WorkerPayrollScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final period = state.myPayroll[index];
-                    return Container(
+                    return GestureDetector(
+                      onTap: () {
+                        _showPeriodDetailBottomSheet(context, period);
+                      },
+                      child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.cardDark : AppColors.cardLight,
@@ -213,6 +218,7 @@ class _WorkerPayrollScreenState extends State<WorkerPayrollScreen> {
                           ],
                         ),
                       ),
+                      ),
                     );
                   },
                   childCount: state.myPayroll.length,
@@ -220,6 +226,145 @@ class _WorkerPayrollScreenState extends State<WorkerPayrollScreen> {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showPeriodDetailBottomSheet(BuildContext context, dynamic period) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final primaryColor = CupertinoTheme.of(context).primaryColor;
+
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.48,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1C1C1E) : CupertinoColors.systemBackground.resolveFrom(context),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFC7C7CC),
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      period.name,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                        inherit: true,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Text(
+                        _statusLabel(period.status),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success,
+                          inherit: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sana oralig\'i: ${period.startDate} - ${period.endDate}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                    inherit: true,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.cardDark : AppColors.cardLight,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Hisoblangan maosh summasi:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                          inherit: true,
+                        ),
+                      ),
+                      Text(
+                        '${_formatMoney(period.totalFinal)} UZS',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.success,
+                          inherit: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.push('/worker/payroll/${period.id}');
+                  },
+                  child: Container(
+                    height: 50,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      'Batafsil ko\'rish',
+                      style: TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

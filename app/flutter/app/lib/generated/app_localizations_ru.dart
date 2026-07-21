@@ -174,4 +174,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get noNetwork => 'Нет сетевого подключения';
+
+  @override
+  String get settings => 'Настройки';
 }

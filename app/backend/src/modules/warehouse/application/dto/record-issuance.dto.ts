@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -11,6 +12,7 @@ import {
 export class RecordIssuanceDto {
   @IsNumber()
   @Min(0.001)
+  @Max(99999999999.999)
   quantity!: number;
 
   @Matches(/^\d{4}-\d{2}-\d{2}$/)

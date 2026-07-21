@@ -54,5 +54,6 @@
   "languageUz": "O'zbekcha",
   "languageRu": "Русский",
   "notifications": "Bildirishnomalar",
-  "noNetwork": "Tarmoq aloqasi yo'q"
+  "noNetwork": "Tarmoq aloqasi yo'q",
+  "settings": "Sozlamalar"
 }

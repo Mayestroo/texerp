@@ -15,6 +15,8 @@ class TeamScreen extends StatefulWidget {
 
 class _TeamScreenState extends State<TeamScreen> {
   String _searchQuery = '';
+  int _viewModeIndex = 0;
+  int _periodIndex = 0;
 
   @override
   void initState() {
@@ -120,39 +122,94 @@ class _TeamScreenState extends State<TeamScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: CupertinoTextField(
-                  placeholder: 'Jamoa a\'zolarini qidirish...',
-                  placeholderStyle: TextStyle(
-                    color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
-                    fontSize: 14,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                  clearButtonMode: OverlayVisibilityMode.editing,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val;
-                    });
-                  },
-                  prefix: Padding(
-                    padding: const EdgeInsets.only(left: 12),
-                    child: Icon(
-                      CupertinoIcons.search,
-                      size: 18,
-                      color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 8),
+                child: Column(
+                  children: [
+                    // View Mode Toggle (Ro'yxat vs Reyting)
+                    SizedBox(
+                      width: double.infinity,
+                      child: CupertinoSlidingSegmentedControl<int>(
+                        groupValue: _viewModeIndex,
+                        children: const {
+                          0: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Jamoa ro\'yxati', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, inherit: true)),
+                          ),
+                          1: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Ish unumdorligi reytingi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, inherit: true)),
+                          ),
+                        },
+                        onValueChanged: (val) {
+                          if (val != null) setState(() => _viewModeIndex = val);
+                        },
+                      ),
                     ),
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
-                    ),
-                  ),
-                  style: TextStyle(
-                    color: isDark ? AppColors.labelDark : AppColors.labelLight,
-                    fontSize: 14,
-                  ),
+                    const SizedBox(height: 12),
+
+                    if (_viewModeIndex == 1) ...[
+                      // Time period selector for ranking
+                      SizedBox(
+                        width: double.infinity,
+                        child: CupertinoSlidingSegmentedControl<int>(
+                          groupValue: _periodIndex,
+                          children: const {
+                            0: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 6),
+                              child: Text('Bugun', style: TextStyle(fontSize: 12, inherit: true)),
+                            ),
+                            1: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 6),
+                              child: Text('Shu hafta', style: TextStyle(fontSize: 12, inherit: true)),
+                            ),
+                            2: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 6),
+                              child: Text('Shu oy', style: TextStyle(fontSize: 12, inherit: true)),
+                            ),
+                          },
+                          onValueChanged: (val) {
+                            if (val != null) setState(() => _periodIndex = val);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      // Search bar for list mode
+                      CupertinoTextField(
+                        placeholder: 'Jamoa a\'zolarini qidirish...',
+                        placeholderStyle: TextStyle(
+                          color: isDark ? AppColors.labelTertiary : AppColors.secondaryLabelLight,
+                          fontSize: 14,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        clearButtonMode: OverlayVisibilityMode.editing,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val;
+                          });
+                        },
+                        prefix: Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Icon(
+                            CupertinoIcons.search,
+                            size: 18,
+                            color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                          ),
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+                          ),
+                        ),
+                        style: TextStyle(
+                          color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

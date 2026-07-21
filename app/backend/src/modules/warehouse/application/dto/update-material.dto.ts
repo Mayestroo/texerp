@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -22,5 +23,6 @@ export class UpdateMaterialDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(99999999999.999)
   min_quantity?: number;
 }

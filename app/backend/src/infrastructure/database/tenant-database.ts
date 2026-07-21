@@ -10,6 +10,12 @@ export class TenantDatabase {
     operation: (manager: EntityManager) => Promise<T>,
   ): Promise<T> {
     return this.dataSource.transaction(async (manager) => {
+      if (manager.queryRunner) {
+        manager.queryRunner.data = {
+          ...manager.queryRunner.data,
+          tenantId,
+        };
+      }
       await manager.query(
         `SELECT set_config('app.current_tenant_id', $1, true)`,
         [tenantId],

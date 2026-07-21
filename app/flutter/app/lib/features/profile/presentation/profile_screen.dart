@@ -6,8 +6,9 @@ import 'package:texerp/core/l10n/locale_cubit.dart';
 import 'package:texerp/features/auth/data/auth_models.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:texerp/generated/app_localizations.dart';
 import 'package:texerp/core/theme/app_theme.dart';
+import 'package:texerp/core/widgets/offline_banner.dart';
 import 'package:texerp/core/widgets/segmented_toggle.dart';
 import 'package:texerp/core/storage/secure_storage.dart';
 import 'package:texerp/core/widgets/app_toast.dart';
@@ -39,21 +40,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         transitionBetweenRoutes: false,
-        middle: Text(l10n.profile, style: const TextStyle(color: AppColors.labelPrimary)),
+        middle: Text(l10n.profile,
+            style: const TextStyle(color: AppColors.labelPrimary)),
       ),
-      child: BlocBuilder<ProfileBloc, ProfileState>(
-        builder: (context, state) {
-          if (state is ProfileLoading) {
-            return const Center(child: CupertinoActivityIndicator());
-          }
-          if (state is ProfileFailure) {
-            return _ErrorView(message: state.error);
-          }
-          if (state is ProfileLoaded) {
-            return _ProfileContent(user: state.user);
-          }
-          return const SizedBox.shrink();
-        },
+      child: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: BlocBuilder<ProfileBloc, ProfileState>(
+              builder: (context, state) {
+                if (state is ProfileLoading) {
+                  return const Center(child: CupertinoActivityIndicator());
+                }
+                if (state is ProfileFailure) {
+                  return _ErrorView(message: state.error);
+                }
+                if (state is ProfileLoaded) {
+                  return _ProfileContent(user: state.user);
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -82,51 +91,76 @@ class _ProfileContent extends StatelessWidget {
                     _AvatarHeader(name: user.fullName),
                     const SizedBox(height: 24),
                     CupertinoListSection.insetGrouped(
-                      header: Text(l10n.fullName.toUpperCase(), style: const TextStyle(color: AppColors.labelSecondary)),
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      header: Text(l10n.fullName.toUpperCase(),
+                          style:
+                              const TextStyle(color: AppColors.labelSecondary)),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       children: [
-                        _buildRow(context, 
-                          title: l10n.fullName, 
-                          additionalInfo: Text(user.fullName, style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                        _buildRow(
+                          context,
+                          title: l10n.fullName,
+                          additionalInfo: Text(user.fullName,
+                              style: textStyle.copyWith(
+                                  color: AppColors.labelPrimary)),
                         ),
-                        _buildRow(context, 
-                          title: l10n.phone, 
-                          additionalInfo: Text(user.phone, style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                        _buildRow(
+                          context,
+                          title: l10n.phone,
+                          additionalInfo: Text(user.phone,
+                              style: textStyle.copyWith(
+                                  color: AppColors.labelPrimary)),
                         ),
-                        _buildRow(context, 
-                          title: l10n.workerCode, 
-                          additionalInfo: Text(user.workerCode, style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                        _buildRow(
+                          context,
+                          title: l10n.workerCode,
+                          additionalInfo: Text(user.workerCode,
+                              style: textStyle.copyWith(
+                                  color: AppColors.labelPrimary)),
                         ),
-                        _buildRow(context, 
-                          title: l10n.role, 
-                          additionalInfo: _RoleBadge(label: _roleLabel(l10n, user.role)),
+                        _buildRow(
+                          context,
+                          title: l10n.role,
+                          additionalInfo:
+                              _RoleBadge(label: _roleLabel(l10n, user.role)),
                         ),
                       ],
                     ),
                     if (user.department != null)
                       CupertinoListSection.insetGrouped(
-                        header: const Text('DEPARTMENT', style: TextStyle(color: AppColors.labelSecondary)),
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        header: const Text('DEPARTMENT',
+                            style: TextStyle(color: AppColors.labelSecondary)),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         children: [
-                          _buildRow(context, 
-                            title: l10n.department, 
-                            additionalInfo: Text(user.department!.name, style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                          _buildRow(
+                            context,
+                            title: l10n.department,
+                            additionalInfo: Text(user.department!.name,
+                                style: textStyle.copyWith(
+                                    color: AppColors.labelPrimary)),
                           ),
                           if (user.role == 'WORKER' && user.foreman != null)
-                            _buildRow(context, 
-                              title: l10n.foreman, 
-                              additionalInfo: Text(user.foreman!.fullName, style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                            _buildRow(
+                              context,
+                              title: l10n.foreman,
+                              additionalInfo: Text(user.foreman!.fullName,
+                                  style: textStyle.copyWith(
+                                      color: AppColors.labelPrimary)),
                             ),
                         ],
                       ),
                     CupertinoListSection.insetGrouped(
-                      header: const Text('PREFERENCES', style: TextStyle(color: AppColors.labelSecondary)),
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      header: const Text('PREFERENCES',
+                          style: TextStyle(color: AppColors.labelSecondary)),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       children: [
                         _LanguageTile(),
-                        _buildRow(context, 
+                        _buildRow(
+                          context,
                           icon: CupertinoIcons.lock,
-                          title: l10n.changePin, 
+                          title: l10n.changePin,
                           trailing: const CupertinoListTileChevron(),
                           onTap: () => context.push('/profile/change-pin'),
                         ),
@@ -134,12 +168,17 @@ class _ProfileContent extends StatelessWidget {
                       ],
                     ),
                     CupertinoListSection.insetGrouped(
-                      header: const Text('ABOUT', style: TextStyle(color: AppColors.labelSecondary)),
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      header: const Text('ABOUT',
+                          style: TextStyle(color: AppColors.labelSecondary)),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       children: [
-                        _buildRow(context, 
-                          title: l10n.version, 
-                          additionalInfo: Text('1.0.0', style: textStyle.copyWith(color: AppColors.labelPrimary)),
+                        _buildRow(
+                          context,
+                          title: l10n.version,
+                          additionalInfo: Text('1.0.0',
+                              style: textStyle.copyWith(
+                                  color: AppColors.labelPrimary)),
                         ),
                       ],
                     ),
@@ -159,7 +198,8 @@ class _ProfileContent extends StatelessWidget {
               height: 48,
               child: CupertinoButton(
                 padding: EdgeInsets.zero,
-                color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+                color: CupertinoColors.secondarySystemGroupedBackground
+                    .resolveFrom(context),
                 borderRadius: BorderRadius.circular(12),
                 onPressed: () => _showLogoutDialog(context),
                 child: Text(
@@ -177,11 +217,12 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
-  Widget _buildRow(BuildContext context, {
-    IconData? icon, 
-    required String title, 
-    Widget? additionalInfo, 
-    Widget? trailing, 
+  Widget _buildRow(
+    BuildContext context, {
+    IconData? icon,
+    required String title,
+    Widget? additionalInfo,
+    Widget? trailing,
     VoidCallback? onTap,
   }) {
     return ConstrainedBox(
@@ -189,10 +230,15 @@ class _ProfileContent extends StatelessWidget {
       child: CupertinoListTile(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         leadingSize: 24,
-        leading: icon != null 
-            ? Icon(icon, size: 24, color: CupertinoTheme.of(context).primaryColor)
+        leading: icon != null
+            ? Icon(icon,
+                size: 24, color: CupertinoTheme.of(context).primaryColor)
             : const SizedBox(width: 24, height: 24),
-        title: Text(title, style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(color: AppColors.labelSecondary)),
+        title: Text(title,
+            style: CupertinoTheme.of(context)
+                .textTheme
+                .textStyle
+                .copyWith(color: AppColors.labelSecondary)),
         additionalInfo: additionalInfo,
         trailing: trailing,
         onTap: onTap,
@@ -257,10 +303,10 @@ class _RoleBadge extends StatelessWidget {
       child: Text(
         label,
         style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-          color: CupertinoTheme.of(context).primaryColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
+              color: CupertinoTheme.of(context).primaryColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
       ),
     );
   }
@@ -284,14 +330,14 @@ class _AvatarHeader extends StatelessWidget {
           color: CupertinoTheme.of(context).primaryColor,
         ),
         child: Center(
-        child: Text(
-          initial,
-          style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-            color: CupertinoColors.white,
-            fontSize: 36,
-            fontWeight: FontWeight.w600,
+          child: Text(
+            initial,
+            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                  color: CupertinoColors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
-        ),
         ),
       ),
     );
@@ -309,8 +355,13 @@ class _LanguageTile extends StatelessWidget {
       child: CupertinoListTile(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         leadingSize: 24,
-        leading: Icon(CupertinoIcons.globe, size: 24, color: CupertinoTheme.of(context).primaryColor),
-        title: Text(l10n.language, style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(color: AppColors.labelSecondary)),
+        leading: Icon(CupertinoIcons.globe,
+            size: 24, color: CupertinoTheme.of(context).primaryColor),
+        title: Text(l10n.language,
+            style: CupertinoTheme.of(context)
+                .textTheme
+                .textStyle
+                .copyWith(color: AppColors.labelSecondary)),
         trailing: SegmentedToggle<String>(
           groupValue: localeCubit.state.languageCode,
           children: {
@@ -323,7 +374,6 @@ class _LanguageTile extends StatelessWidget {
     );
   }
 }
-
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message});
@@ -340,14 +390,18 @@ class _ErrorView extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.labelPrimary)),
+            child: Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.labelPrimary)),
           ),
           const SizedBox(height: 16),
           CupertinoButton(
             onPressed: () {
               final userId = context.read<AuthBloc>().state.user?.id;
               if (userId != null) {
-                context.read<ProfileBloc>().add(ProfileLoadRequested(userId: userId));
+                context
+                    .read<ProfileBloc>()
+                    .add(ProfileLoadRequested(userId: userId));
               }
             },
             color: CupertinoTheme.of(context).primaryColor,
@@ -363,7 +417,8 @@ class _SecuritySettingsSection extends StatefulWidget {
   const _SecuritySettingsSection();
 
   @override
-  State<_SecuritySettingsSection> createState() => _SecuritySettingsSectionState();
+  State<_SecuritySettingsSection> createState() =>
+      _SecuritySettingsSectionState();
 }
 
 class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
@@ -383,10 +438,11 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
     final storage = context.read<SecureStorage>();
     final usePin = await storage.getUsePinLock();
     final useBio = await storage.getUseBiometric();
-    
+
     bool isSupported = false;
     try {
-      isSupported = await _localAuth.isDeviceSupported() || await _localAuth.canCheckBiometrics;
+      isSupported = await _localAuth.isDeviceSupported() ||
+          await _localAuth.canCheckBiometrics;
     } catch (_) {
       isSupported = false;
     }
@@ -421,7 +477,9 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         _usePinLock = true;
       });
       if (mounted) {
-        AppToast.show(context, message: 'PIN-kod bilan kirish faollashtirildi', type: ToastType.success);
+        AppToast.show(context,
+            message: 'PIN-kod bilan kirish faollashtirildi',
+            type: ToastType.success);
       }
     } else {
       await storage.setUsePinLock(false);
@@ -432,7 +490,8 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         _useBiometric = false;
       });
       if (mounted) {
-        AppToast.show(context, message: 'PIN-kod bilan kirish oʻchirildi', type: ToastType.info);
+        AppToast.show(context,
+            message: 'PIN-kod bilan kirish oʻchirildi', type: ToastType.info);
       }
     }
   }
@@ -449,7 +508,9 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         if (!authenticated) return;
       } catch (e) {
         if (mounted) {
-          AppToast.show(context, message: 'Biometrik tasdiqlash bajarilmadi', type: ToastType.error);
+          AppToast.show(context,
+              message: 'Biometrik tasdiqlash bajarilmadi',
+              type: ToastType.error);
         }
         return;
       }
@@ -459,7 +520,9 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         _useBiometric = true;
       });
       if (mounted) {
-        AppToast.show(context, message: 'Biometrik autentifikatsiya yoqildi', type: ToastType.success);
+        AppToast.show(context,
+            message: 'Biometrik autentifikatsiya yoqildi',
+            type: ToastType.success);
       }
     } else {
       await storage.setUseBiometric(false);
@@ -467,7 +530,9 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         _useBiometric = false;
       });
       if (mounted) {
-        AppToast.show(context, message: 'Biometrik autentifikatsiya oʻchirildi', type: ToastType.info);
+        AppToast.show(context,
+            message: 'Biometrik autentifikatsiya oʻchirildi',
+            type: ToastType.info);
       }
     }
   }
@@ -503,23 +568,24 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
               onPressed: () async {
                 final pin = textController.text;
                 if (pin.length != 4) return;
-                
+
                 showCupertinoDialog<void>(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) => const Center(child: CupertinoActivityIndicator()),
+                  builder: (context) =>
+                      const Center(child: CupertinoActivityIndicator()),
                 );
 
                 try {
                   await context.read<AuthRepository>().verifyPin(pin);
                   result = pin;
                   if (context.mounted) {
-                    Navigator.pop(context); 
-                    Navigator.pop(context); 
+                    Navigator.pop(context);
+                    Navigator.pop(context);
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    Navigator.pop(context); 
+                    Navigator.pop(context);
                     String msg = "PIN kod noto'g'ri";
                     if (e is NetworkException) {
                       msg = e.message;
@@ -552,8 +618,10 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
       children: [
         CupertinoListTile(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          leading: Icon(CupertinoIcons.lock_shield, size: 24, color: CupertinoTheme.of(context).primaryColor),
-          title: Text('PIN-kod bilan kirish', style: textStyle.copyWith(color: AppColors.labelPrimary)),
+          leading: Icon(CupertinoIcons.lock_shield,
+              size: 24, color: CupertinoTheme.of(context).primaryColor),
+          title: Text('PIN-kod bilan kirish',
+              style: textStyle.copyWith(color: AppColors.labelPrimary)),
           trailing: CupertinoSwitch(
             value: _usePinLock,
             onChanged: _togglePinLock,
@@ -562,8 +630,10 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
         if (_usePinLock && _isBiometricSupported)
           CupertinoListTile(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            leading: Icon(CupertinoIcons.device_phone_portrait, size: 24, color: CupertinoTheme.of(context).primaryColor),
-            title: Text('Face ID / Touch ID', style: textStyle.copyWith(color: AppColors.labelPrimary)),
+            leading: Icon(CupertinoIcons.device_phone_portrait,
+                size: 24, color: CupertinoTheme.of(context).primaryColor),
+            title: Text('Face ID / Touch ID',
+                style: textStyle.copyWith(color: AppColors.labelPrimary)),
             trailing: CupertinoSwitch(
               value: _useBiometric,
               onChanged: _toggleBiometric,
@@ -573,4 +643,3 @@ class _SecuritySettingsSectionState extends State<_SecuritySettingsSection> {
     );
   }
 }
-

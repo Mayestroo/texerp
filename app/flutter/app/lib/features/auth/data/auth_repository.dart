@@ -86,6 +86,18 @@ class AuthRepository {
     }
   }
 
+  /// Registers the device FCM token with the backend.
+  Future<void> registerFcmToken(String fcmToken) async {
+    try {
+      await _apiClient.dio.put<Map<String, dynamic>>(
+        '/users/me/fcm-token',
+        data: {'fcm_token': fcmToken},
+      );
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    }
+  }
+
   /// Verifies if the PIN is correct
   Future<void> verifyPin(String pin) async {
     try {

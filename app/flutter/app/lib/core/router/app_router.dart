@@ -13,11 +13,32 @@ import 'package:texerp/features/profile/data/profile_repository.dart';
 import 'package:texerp/features/profile/presentation/change_pin_screen.dart';
 import 'package:texerp/features/profile/presentation/profile_bloc.dart';
 import 'package:texerp/features/profile/presentation/profile_screen.dart';
+import 'package:texerp/core/common/placeholder_screen.dart';
 import 'package:texerp/core/common/role_based_shell.dart';
+import 'package:texerp/core/notifications/fcm_service.dart';
 import 'package:texerp/features/auth/presentation/lock_screen.dart';
+import 'package:texerp/features/notifications/data/notifications_repository.dart';
+import 'package:texerp/features/notifications/presentation/notifications_bloc.dart';
+import 'package:texerp/features/notifications/presentation/notifications_screen.dart';
 import 'package:texerp/features/payroll/data/payroll_repository.dart';
 import 'package:texerp/features/payroll/presentation/payroll_bloc.dart';
 import 'package:texerp/features/payroll/presentation/payroll_period_detail_screen.dart';
+import 'package:texerp/features/production/data/production_repository.dart';
+import 'package:texerp/features/production/data/production_models.dart';
+import 'package:texerp/features/production/presentation/entry_detail_screen.dart';
+import 'package:texerp/features/production/presentation/foreman_queue_bloc.dart';
+import 'package:texerp/features/production/presentation/foreman_queue_screen.dart';
+import 'package:texerp/features/reports/data/reports_repository.dart';
+import 'package:texerp/features/reports/presentation/reports_bloc.dart';
+import 'package:texerp/features/reports/presentation/reports_screen.dart';
+import 'package:texerp/features/settings/data/settings_repository.dart';
+import 'package:texerp/features/settings/presentation/settings_bloc.dart';
+import 'package:texerp/features/settings/presentation/settings_screen.dart';
+import 'package:texerp/features/warehouse/data/warehouse_repository.dart';
+import 'package:texerp/features/warehouse/data/warehouse_models.dart' as warehouse;
+import 'package:texerp/features/warehouse/presentation/warehouse_bloc.dart';
+import 'package:texerp/features/warehouse/presentation/materials_list_screen.dart';
+import 'package:texerp/features/warehouse/presentation/material_detail_screen.dart';
 
 class _FadePage extends CustomTransitionPage<void> {
   _FadePage({required super.child, super.key})
@@ -37,11 +58,22 @@ class _FadePage extends CustomTransitionPage<void> {
 }
 
 class AppRouter {
-  AppRouter({required AuthBloc authBloc}) : _authBloc = authBloc;
+  AppRouter({
+    required AuthBloc authBloc,
+    required FcmService fcmService,
+  })  : _authBloc = authBloc,
+        _fcmService = fcmService {
+    // Subscribe to deep links from FCM (foreground taps)
+    _deepLinkSubscription = _fcmService.deepLinkStream.listen((link) {
+      _router.go(link);
+    });
+  }
 
   final AuthBloc _authBloc;
+  final FcmService _fcmService;
+  StreamSubscription<String>? _deepLinkSubscription;
 
-  GoRouter get router => GoRouter(
+  late final GoRouter _router = GoRouter(
         initialLocation: '/splash',
         refreshListenable: _AuthRefreshStream(_authBloc.stream),
         debugLogDiagnostics: false,
@@ -49,7 +81,7 @@ class AppRouter {
           final authState = _authBloc.state;
           final isAuthenticated = authState is AuthAuthenticated;
           final isUnauthenticated = authState is AuthUnauthenticated;
-          
+
           final isLoggingIn = state.matchedLocation == '/login';
           final isSplash = state.matchedLocation == '/splash';
           final isLock = state.matchedLocation == '/lock';
@@ -61,16 +93,22 @@ class AppRouter {
           if (isUnauthenticated && !isLoggingIn) {
             return '/login';
           }
-          
+
           if (isAuthenticated) {
             if (authState.isLocked) {
               return '/lock';
             }
+
+            final deepLink = _fcmService.pendingDeepLink;
+            if (deepLink != null && deepLink != state.uri.toString()) {
+              return deepLink;
+            }
+
             if (isLoggingIn || isSplash || isLock) {
               return _homeForRole(authState.user.role);
             }
           }
-          
+
           return null;
         },
         routes: [
@@ -158,8 +196,120 @@ class AppRouter {
               child: const ChangePinScreen(),
             ),
           ),
+          GoRoute(
+            path: '/settings',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => SettingsBloc(
+                  settingsRepository: context.read<SettingsRepository>(),
+                ),
+                child: const SettingsScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/worker/history/:id',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: EntryDetailScreen(
+                entryId: state.pathParameters['id']!,
+                entry: state.extra as ProductionEntry?,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/warehouse/materials',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => WarehouseBloc(
+                  warehouseRepository: context.read<WarehouseRepository>(),
+                ),
+                child: const MaterialsListScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/warehouse/materials/:id',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => WarehouseBloc(
+                  warehouseRepository: context.read<WarehouseRepository>(),
+                ),
+                child: MaterialDetailScreen(
+                  materialId: state.pathParameters['id']!,
+                  material: state.extra as warehouse.Material?,
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/worker/payroll/:id',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => PayrollBloc(
+                  payrollRepository: context.read<PayrollRepository>(),
+                ),
+                child: PayrollPeriodDetailScreen(
+                  periodId: state.pathParameters['id']!,
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/foreman/pending',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => ForemanQueueBloc(
+                  productionRepository: context.read<ProductionRepository>(),
+                ),
+                child: const ForemanQueueScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/notifications',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => NotificationsBloc(
+                  notificationsRepository: context.read<NotificationsRepository>(),
+                ),
+                child: const NotificationsScreen(),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/payroll/export/:id',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: const PlaceholderScreen(title: 'Export Status'),
+            ),
+          ),
+          GoRoute(
+            path: '/reports/production',
+            pageBuilder: (context, state) => _FadePage(
+              key: state.pageKey,
+              child: BlocProvider(
+                create: (_) => ReportsBloc(
+                  reportsRepository: context.read<ReportsRepository>(),
+                ),
+                child: const ReportsScreen(),
+              ),
+            ),
+          ),
         ],
       );
+
+  GoRouter get router => _router;
+
+  void dispose() {
+    _deepLinkSubscription?.cancel();
+  }
 
   String _homeForRole(String role) {
     switch (role) {

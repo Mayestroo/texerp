@@ -91,6 +91,7 @@ export class MaterialsController {
   ): Promise<{ success: true; data: MaterialView }> {
     const data = await this.materialsService.update(
       request.user.tenant_id,
+      request.user.sub,
       id,
       dto,
     );
@@ -106,6 +107,7 @@ export class MaterialsController {
   ): Promise<{ success: true; data: MaterialView }> {
     const data = await this.materialsService.deactivate(
       request.user.tenant_id,
+      request.user.sub,
       id,
     );
     return { success: true, data };
@@ -120,6 +122,7 @@ export class MaterialsController {
   ): Promise<{ success: true; data: MaterialView }> {
     const data = await this.materialsService.activate(
       request.user.tenant_id,
+      request.user.sub,
       id,
     );
     return { success: true, data };
