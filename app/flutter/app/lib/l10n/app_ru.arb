@@ -54,5 +54,6 @@
   "languageUz": "O'zbekcha",
   "languageRu": "Русский",
   "notifications": "Уведомления",
-  "noNetwork": "Нет сетевого подключения"
+  "noNetwork": "Нет сетевого подключения",
+  "settings": "Настройки"
 }

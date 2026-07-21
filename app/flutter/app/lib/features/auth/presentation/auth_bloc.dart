@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:texerp/core/error/network_exception.dart';
 import 'package:texerp/core/network/token_provider.dart';
+import 'package:texerp/core/notifications/fcm_service.dart';
 import 'package:texerp/core/storage/secure_storage.dart';
 import 'package:texerp/features/auth/data/auth_models.dart';
 import 'package:texerp/features/auth/data/auth_repository.dart';
@@ -126,9 +127,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required AuthRepository authRepository,
     required SecureStorage secureStorage,
     required TokenProvider tokenProvider,
+    required FcmService fcmService,
   })  : _authRepository = authRepository,
         _secureStorage = secureStorage,
         _tokenProvider = tokenProvider,
+        _fcmService = fcmService,
         super(const AuthInitial()) {
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
@@ -145,6 +148,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository _authRepository;
   final SecureStorage _secureStorage;
   final TokenProvider _tokenProvider;
+  final FcmService _fcmService;
 
   @override
   void onChange(Change<AuthState> change) {
@@ -169,6 +173,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           currentPin: event.pin,
         ),
       );
+      try {
+        await _fcmService.registerToken();
+      } catch (_) {
+        // Don't fail login if FCM registration fails.
+      }
     } on NetworkException catch (e) {
       emit(AuthFailure(error: e));
     } catch (e) {
@@ -184,6 +193,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    await _fcmService.unsubscribe();
     await _secureStorage.clearTokens();
     _tokenProvider.accessToken = null;
     emit(const AuthUnauthenticated());
@@ -216,6 +226,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           isLocked: usePinLock,
         ),
       );
+      try {
+        await _fcmService.registerToken();
+      } catch (_) {
+        // Best-effort registration; don't fail refresh.
+      }
     } on NetworkException catch (e) {
       if (e.code == 'NETWORK_ERROR') {
         emit(AuthFailure(error: e));

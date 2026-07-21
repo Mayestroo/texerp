@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:texerp/core/theme/app_theme.dart';
 import 'package:texerp/features/production/data/production_repository.dart';
 import 'package:texerp/features/production/data/production_models.dart';
@@ -160,6 +161,12 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
+                    if (_productionSummary != null && _productionSummary!.pendingEntriesCount > 0) ...[
+                      _buildAlertsBanner(isDark),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildQuickLinksRow(isDark, primaryColor),
+                    const SizedBox(height: 16),
                     _buildProductionCard(isDark),
                     const SizedBox(height: 16),
                     _buildPayrollCard(isDark),
@@ -521,6 +528,159 @@ class _DirectorDashboardScreenState extends State<DirectorDashboardScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAlertsBanner(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              CupertinoIcons.bell_fill,
+              color: AppColors.warningDark,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tizim ogohlantirishi',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warningDark,
+                    inherit: true,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Tasdiqlash kutilayotgan ${_productionSummary!.pendingEntriesCount} ta ish mavjud.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.labelSecondary : AppColors.secondaryLabelLight,
+                    inherit: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickLinksRow(bool isDark, Color primaryColor) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickLinkCard(
+            title: 'Hisobotlar',
+            icon: CupertinoIcons.chart_bar_alt_fill,
+            color: const Color(0xFF6366F1),
+            isDark: isDark,
+            onTap: () => context.push('/reports/production'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickLinkCard(
+            title: 'Omborxona',
+            icon: CupertinoIcons.cube_box_fill,
+            color: const Color(0xFF10B981),
+            isDark: isDark,
+            onTap: () => context.push('/warehouse/materials'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickLinkCard(
+            title: 'Sozlamalar',
+            icon: CupertinoIcons.gear_alt_fill,
+            color: const Color(0xFFF59E0B),
+            isDark: isDark,
+            onTap: () => context.push('/settings'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickLinkCard extends StatelessWidget {
+  const _QuickLinkCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : AppColors.cardLight,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark ? const Color(0x1AFFFFFF) : const Color(0x0F000000),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.black.withOpacity(isDark ? 0.2 : 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.labelDark : AppColors.labelLight,
+                inherit: true,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

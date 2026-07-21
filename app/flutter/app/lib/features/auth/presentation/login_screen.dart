@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:texerp/core/l10n/locale_cubit.dart';
 import 'package:texerp/features/auth/presentation/auth_bloc.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:texerp/generated/app_localizations.dart';
 import 'package:texerp/core/theme/app_theme.dart';
 import 'package:texerp/core/widgets/segmented_toggle.dart';
 import 'package:texerp/core/widgets/app_toast.dart';

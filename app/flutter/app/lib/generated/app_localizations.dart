@@ -427,6 +427,12 @@ abstract class AppLocalizations {
   /// In uz, this message translates to:
   /// **'Tarmoq aloqasi yo\'q'**
   String get noNetwork;
+
+  /// No description provided for @settings.
+  ///
+  /// In uz, this message translates to:
+  /// **'Sozlamalar'**
+  String get settings;
 }
 
 class _AppLocalizationsDelegate
